@@ -4,7 +4,7 @@ import { projects } from "@/data/projects";
 import { Section } from "@/components/ui/section";
 import { GithubIcon } from "@/components/ui/brand-icons";
 
-const curatedIds = ["website-content-search", "movie-data-pipeline", "blockchain-pharma", "form-builder"];
+const curatedIds = ["trek-saathi", "website-content-search", "movie-data-pipeline", "form-builder"];
 
 export function GitHubSection() {
   const curated = curatedIds.map((id) => projects.find((p) => p.id === id)).filter(Boolean);
@@ -18,7 +18,7 @@ export function GitHubSection() {
           </span>
           <div>
             <p className="text-lg font-medium text-foreground">@{profile.githubHandle}</p>
-            <p className="text-sm text-muted">17 public repositories</p>
+            <p className="text-sm text-muted">18 public repositories</p>
           </div>
         </div>
         <a

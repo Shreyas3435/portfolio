@@ -47,19 +47,19 @@ export const timeline: TimelineEntry[] = [
     verified: false,
   },
   {
-    id: "professional-workflow",
-    label: "Artifact workflow platform",
-    date: "Professional",
-    description:
-      "A full-stack workflow platform for artifact creation, review, and approval, with enforced immutability and authorization.",
-    verified: false,
-  },
-  {
     id: "ai-applications",
     label: "AI applications & workflow spikes",
     date: "Jan – Mar 2026",
     description:
       "An AI summarization scaffold, a Form.io evaluation spike for AI-assisted validation, and a service-oriented form-builder platform.",
+    verified: true,
+  },
+  {
+    id: "trek-saathi",
+    label: "Trek Saathi — trekking marketplace",
+    date: "Sep 2026",
+    description:
+      "A full-stack trekking discovery and booking platform for the Western Ghats — FastAPI/PostgreSQL backend, React/TypeScript frontend, deployed and still actively being developed.",
     verified: true,
   },
   {

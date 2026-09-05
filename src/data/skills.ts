@@ -41,15 +41,15 @@ export const skills: SkillNode[] = [
     name: "React",
     level: "strong",
     category: "fullstack",
-    relatedProjectIds: ["website-content-search", "form-builder", "blockchain-pharma", "formio-spike"],
-    blurb: "Frontend architecture across search UIs, workflow editors, and Web3 frontends.",
+    relatedProjectIds: ["trek-saathi", "website-content-search", "form-builder", "blockchain-pharma", "formio-spike"],
+    blurb: "Frontend architecture across search UIs, workflow editors, marketplaces, and Web3 frontends.",
   },
   {
     id: "python-backend",
     name: "Python Backends",
     level: "core",
     category: "fullstack",
-    relatedProjectIds: ["website-content-search", "movie-data-pipeline", "ai-summary"],
+    relatedProjectIds: ["trek-saathi", "website-content-search", "movie-data-pipeline", "ai-summary"],
     blurb: "Flask/FastAPI services, ETL pipelines, and data processing scripts.",
   },
   {
@@ -57,7 +57,7 @@ export const skills: SkillNode[] = [
     name: "Workflow Architecture",
     level: "strong",
     category: "fullstack",
-    relatedProjectIds: ["artifact-platform", "form-builder", "frappe-artifact-editor"],
+    relatedProjectIds: ["trek-saathi", "form-builder", "frappe-artifact-editor"],
     blurb: "Lifecycle modeling, state transitions, and backend-enforced authorization.",
   },
   {
@@ -65,7 +65,7 @@ export const skills: SkillNode[] = [
     name: "API Design",
     level: "strong",
     category: "fullstack",
-    relatedProjectIds: ["artifact-platform", "form-builder", "website-content-search"],
+    relatedProjectIds: ["trek-saathi", "form-builder", "website-content-search"],
     blurb: "REST APIs across microservice and monolithic backends.",
   },
 
@@ -75,8 +75,8 @@ export const skills: SkillNode[] = [
     name: "Application Security",
     level: "working",
     category: "security",
-    relatedProjectIds: ["shadowpath", "hashing"],
-    blurb: "Attack-surface thinking, authorization enforcement, secure-by-default design.",
+    relatedProjectIds: ["shadowpath", "trek-saathi", "hashing"],
+    blurb: "Attack-surface thinking, role-based authorization enforcement, secure-by-default design.",
   },
   {
     id: "devsecops",
@@ -117,8 +117,8 @@ export const skills: SkillNode[] = [
     name: "Databases",
     level: "working",
     category: "systems",
-    relatedProjectIds: ["movie-data-pipeline", "frappe-artifact-editor", "blockchain-pharma"],
-    blurb: "SQLite, MariaDB, and MongoDB across relational and document workloads.",
+    relatedProjectIds: ["trek-saathi", "movie-data-pipeline", "frappe-artifact-editor", "blockchain-pharma"],
+    blurb: "PostgreSQL, SQLite, MariaDB, and MongoDB across relational and document workloads.",
   },
   {
     id: "docker",
