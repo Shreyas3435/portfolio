@@ -37,6 +37,9 @@ export const metadata: Metadata = {
     "Portfolio",
   ],
   authors: [{ name: profile.name, url: profile.github }],
+  alternates: {
+    canonical: siteUrl,
+  },
   openGraph: {
     title,
     description,
@@ -52,6 +55,30 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+    },
+  },
+};
+
+const personJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  name: profile.name,
+  url: siteUrl,
+  jobTitle: profile.role,
+  description: profile.heroSupport,
+  email: `mailto:${profile.email}`,
+  sameAs: [profile.github, profile.linkedin],
+  worksFor: {
+    "@type": "Organization",
+    name: "Smarter.Codes",
+  },
+  alumniOf: {
+    "@type": "CollegeOrUniversity",
+    name: profile.education.institution,
   },
 };
 
@@ -66,6 +93,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
+        />
         <UIStateProvider>
           <Nav />
           <main className="flex-1">{children}</main>

@@ -19,9 +19,24 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { slug } = await params;
   const project = getProjectBySlug(slug);
   if (!project) return {};
+  const path = `/work/${project.slug}`;
   return {
     title: project.name,
     description: project.description,
+    alternates: {
+      canonical: path,
+    },
+    openGraph: {
+      title: `${project.name} — Case Study`,
+      description: project.description,
+      url: path,
+      type: "article",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${project.name} — Case Study`,
+      description: project.description,
+    },
   };
 }
 
