@@ -11,8 +11,8 @@ export function FeaturedProjects() {
       description="Four systems that best represent how I approach engineering — problem first, architecture second, technology last."
     >
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        {flagshipProjects.map((project) => (
-          <ProjectCard key={project.id} project={project} variant="flagship" />
+        {flagshipProjects.map((project, i) => (
+          <ProjectCard key={project.id} project={project} variant="flagship" index={i} />
         ))}
       </div>
     </Section>

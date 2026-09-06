@@ -1,31 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, useMotionValue, useSpring, useTransform, type PanInfo } from "motion/react";
-
-const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
-
-function subscribeToReducedMotion(callback: () => void) {
-  const mql = window.matchMedia(REDUCED_MOTION_QUERY);
-  mql.addEventListener("change", callback);
-  return () => mql.removeEventListener("change", callback);
-}
-
-function getReducedMotionSnapshot() {
-  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
-}
-
-function getReducedMotionServerSnapshot() {
-  return false;
-}
-
-function useIsReducedMotion() {
-  return useSyncExternalStore(
-    subscribeToReducedMotion,
-    getReducedMotionSnapshot,
-    getReducedMotionServerSnapshot,
-  );
-}
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 interface Node {
   id: string;
@@ -85,7 +62,7 @@ export function SystemMap() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [showHint, setShowHint] = useState(false);
-  const prefersReducedMotion = useIsReducedMotion();
+  const prefersReducedMotion = useReducedMotion();
 
   const mvX = useMotionValue(0);
   const mvY = useMotionValue(0);

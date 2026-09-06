@@ -44,6 +44,28 @@ body {
   background-attachment: fixed;
 }
 
+@keyframes drift-1 {
+  0%, 100% { transform: translate(-14%, -10%) scale(1); }
+  50% { transform: translate(12%, 14%) scale(1.25); }
+}
+
+@keyframes drift-2 {
+  0%, 100% { transform: translate(16%, 8%) scale(1.15); }
+  50% { transform: translate(-14%, -16%) scale(0.9); }
+}
+
+@keyframes drift-3 {
+  0%, 100% { transform: translate(-8%, 16%) scale(0.85); }
+  50% { transform: translate(10%, -14%) scale(1.2); }
+}
+
+.ambient-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(80px);
+  will-change: transform;
+}
+
 ::selection {
   background: var(--accent-soft);
   color: var(--foreground);

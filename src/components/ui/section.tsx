@@ -1,4 +1,7 @@
+"use client";
+
 import type { ReactNode } from "react";
+import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 
 interface SectionProps {
@@ -13,7 +16,13 @@ interface SectionProps {
 export function Section({ id, eyebrow, title, description, children, className }: SectionProps) {
   return (
     <section id={id} className={cn("scroll-mt-24 py-20 md:py-28", className)}>
-      <div className="mx-auto max-w-6xl px-6">
+      <motion.div
+        initial={{ opacity: 0, y: 28 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-80px" }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="mx-auto max-w-6xl px-6"
+      >
         {(eyebrow || title) && (
           <div className="mb-12 max-w-2xl">
             {eyebrow && (
@@ -30,7 +39,7 @@ export function Section({ id, eyebrow, title, description, children, className }
           </div>
         )}
         {children}
-      </div>
+      </motion.div>
     </section>
   );
 }

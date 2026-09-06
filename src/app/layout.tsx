@@ -5,6 +5,8 @@ import { UIStateProvider } from "@/components/providers/ui-state-provider";
 import { Nav } from "@/components/navigation/nav";
 import { CommandPalette } from "@/components/command-palette/command-palette";
 import { Footer } from "@/components/footer/footer";
+import { AmbientBackground } from "@/components/providers/ambient-background";
+import { CursorGlow } from "@/components/providers/cursor-glow";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -97,6 +99,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
         />
+        <AmbientBackground />
+        <CursorGlow />
         <UIStateProvider>
           <Nav />
           <main className="flex-1">{children}</main>

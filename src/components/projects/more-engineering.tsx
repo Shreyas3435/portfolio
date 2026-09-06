@@ -12,8 +12,8 @@ export function MoreEngineering() {
       description="Smaller builds, spikes, and evaluation prototypes — kept honest about what stage each one is at."
     >
       <div className="mb-16 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {secondaryProjects.map((project) => (
-          <ProjectCard key={project.id} project={project} variant="compact" />
+        {secondaryProjects.map((project, i) => (
+          <ProjectCard key={project.id} project={project} variant="compact" index={i} />
         ))}
       </div>
 
