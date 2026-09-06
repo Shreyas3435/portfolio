@@ -53,6 +53,12 @@ export function CommandPalette() {
         action: () => window.open(profile.github, "_blank", "noopener,noreferrer"),
       },
       {
+        id: "view-resume",
+        label: "View Resume",
+        group: "Actions",
+        action: () => window.open(profile.resumeUrl, "_blank", "noopener,noreferrer"),
+      },
+      {
         id: "email",
         label: "Email Shreyas",
         group: "Actions",

@@ -9,6 +9,7 @@ export const profile = {
   github: "https://github.com/Shreyas3435",
   githubHandle: "Shreyas3435",
   linkedin: "https://www.linkedin.com/in/shreyas-alva-baa888227",
+  resumeUrl: "https://docs.google.com/document/d/1WkU_blNT6qyDVdsXeBusQrh1x5zSSACv/export?format=pdf",
   whatIBuild:
     "AI-powered applications, intelligent search systems, full-stack platforms, and security tooling.",
   howIThink:
