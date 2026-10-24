@@ -1,6 +1,6 @@
 import type { PropKind, TreeKind } from "./art";
 import { COURT, DECOR, EDGE, NAME, PARKING, PLAZA, PONDS, TAGLINE, TRACK_Y, WORLD_H, WORLD_W, districts, places, roads } from "./places";
-import { type Ctx, type Pt, C, blobPath, clouds, grain, mulberry32, pick, range, rgba, text, texture } from "./paint";
+import { type Ctx, type Pt, C, blobPath, clouds, displayFont, grain, mulberry32, pick, range, rgba, text, texture } from "./paint";
 
 export const TILE = 512;
 const ROAD_W = 56;
@@ -189,7 +189,7 @@ export function buildWorld(): WorldData {
     addProp("planter", p.x - p.w / 2 + 6, yy, [[0, 0, 15]]);
     addProp("planter", p.x + p.w / 2 - 6, yy, [[0, 0, 15]]);
   }
-  for (const [x, y] of [[1600, 1180], [1800, 1180], [690, 1360], [880, 1360], [2700, 1460], [2920, 1460]]) addProp("bench", x, y, [[0, 0, 14]]);
+  for (const [x, y] of [[1590, 1200], [1810, 1200], [690, 1360], [880, 1360], [2700, 1460], [2920, 1460]]) addProp("bench", x, y, [[0, 0, 14]]);
 
   places.forEach((p, i) => {
     if (p.kind === "skills") colliders.push({ x: p.x, y: p.y, r: 22, ref: { type: "place", i } });
@@ -674,8 +674,29 @@ export function renderTile(w: WorldData, tx: number, ty: number, scale: number):
     }
   }
 
-  if (intersects([TAGLINE.x - 520, TAGLINE.y - 40, TAGLINE.x + 520, TAGLINE.y + 40], x0, y0, x1, y1)) {
-    text(ctx, TAGLINE.text, TAGLINE.x, TAGLINE.y, 22, "rgba(250,250,245,0.92)", { weight: 700, shadow: "rgba(0,0,0,0.35)" });
+  if (intersects([TAGLINE.x - 560, TAGLINE.y - 40, TAGLINE.x + 560, TAGLINE.y + 40], x0, y0, x1, y1)) {
+    // Dark stone plaque set into the ground so the line reads on any surface.
+    ctx.font = displayFont(22, 700);
+    const tw = ctx.measureText(TAGLINE.text).width;
+    const pw = tw + 56;
+    const ph = 42;
+    const px = TAGLINE.x - pw / 2;
+    const py = TAGLINE.y - ph / 2;
+    ctx.fillStyle = "rgba(10, 16, 24, 0.35)";
+    ctx.beginPath();
+    ctx.roundRect(px + 3, py + 4, pw, ph, 8);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.roundRect(px, py, pw, ph, 8);
+    ctx.fillStyle = "#1b2330";
+    ctx.fill();
+    texture(ctx, grain(), 0.25, "overlay");
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.22)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(px + 4, py + 4, pw - 8, ph - 8, 5);
+    ctx.stroke();
+    text(ctx, TAGLINE.text, TAGLINE.x, TAGLINE.y + 1, 22, "#f8fafc", { weight: 700 });
   }
   return c;
 }

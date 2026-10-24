@@ -34,7 +34,7 @@ import {
 } from "./art";
 import { drawDecorOverlay, drawPlaceOverlay } from "./overlays";
 import { type Ctx, displayFont, mulberry32, rgba, setDisplayFamily, text } from "./paint";
-import { CONES, COURT, DECOR, EDGE, NAME, PARKING, PONDS, SPAWN, TRACK_Y, WORLD_H, WORLD_W, districts, places, type Place } from "./places";
+import { CONES, COURT, DECOR, EDGE, NAME, PARKING, PONDS, SPAWN, TAGLINE, TRACK_Y, WORLD_H, WORLD_W, districts, places, type Place } from "./places";
 import { TILE, buildWorld, contact, queryColliders, renderTile, type Standing, type WorldData } from "./scenery";
 
 export interface EngineCallbacks {
@@ -1248,6 +1248,10 @@ export class WorldEngine {
     ctx.fillStyle = `rgba(6, 10, 26, ${0.72 * k})`;
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.setTransform(S, 0, 0, S, ox, oy);
+    // The ground plaque is backlit, so its lettering stays crisp after dark.
+    if (TAGLINE.y > top - 40 && TAGLINE.y < top + vh + 40) {
+      text(ctx, TAGLINE.text, TAGLINE.x, TAGLINE.y + 1, 22, "#f8fafc", { weight: 700, alpha: k });
+    }
     ctx.globalCompositeOperation = "lighter";
     const visible = (x: number, y: number, r: number) => x + r > left && x - r < left + vw && y + r > top && y - r < top + vh;
     const lamp = (x: number, y: number, r: number, color: string, a: number) => {
