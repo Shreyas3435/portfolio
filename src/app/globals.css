@@ -28,6 +28,7 @@
   --color-accent-foreground: var(--accent-foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-hand: var(--font-caveat), cursive;
 }
 
 html {
@@ -84,5 +85,148 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ------------------------------------------------------------------------
+   Sketch world
+   ------------------------------------------------------------------------ */
+
+.sketch-world {
+  --paper: #f6f1e7;
+  --card: #fffaf0;
+  --ink: #33333a;
+  --ink-soft: #5d5d66;
+  --ink-faint: rgba(51, 51, 58, 0.25);
+  background: var(--paper);
+  color: var(--ink);
+  color-scheme: light;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sketch-vignette {
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(120, 100, 70, 0.16) 100%);
+}
+
+.sketch-card,
+.sketch-chip {
+  background: var(--card);
+  border: 2px solid var(--ink);
+  border-radius: 14px 6px 16px 5px / 5px 15px 6px 14px;
+  box-shadow: 3px 4px 0 rgba(51, 51, 58, 0.85);
+}
+
+.sketch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--card);
+  border: 2px solid var(--ink);
+  border-radius: 10px 4px 11px 4px / 4px 10px 4px 11px;
+  box-shadow: 2px 2px 0 var(--ink);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.sketch-btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.sketch-btn:active {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+
+.sketch-btn:focus-visible {
+  outline: 3px dashed var(--ink);
+  outline-offset: 3px;
+}
+
+.sketch-btn-solid {
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+}
+
+.sketch-kbd {
+  display: inline-block;
+  min-width: 1.4em;
+  margin: 0 1px;
+  padding: 0 0.3em;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--ink);
+  background: #fff;
+  border: 1.5px solid var(--ink);
+  border-radius: 4px;
+  box-shadow: 0 1.5px 0 var(--ink);
+}
+
+.sketch-tag {
+  padding: 0.1rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px 900px 999px 800px;
+  background: color-mix(in srgb, var(--tag) 22%, white);
+}
+
+.sketch-note {
+  padding: 0.75rem 0.9rem;
+  border: 1.5px solid var(--ink);
+  border-radius: 3px;
+  box-shadow: 2px 3px 0 rgba(51, 51, 58, 0.6);
+}
+
+.sketch-pop {
+  animation: sketch-pop 0.28s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.sketch-slide {
+  animation: sketch-slide 0.32s cubic-bezier(0.2, 1, 0.3, 1) both;
+}
+
+@keyframes sketch-pop {
+  from { opacity: 0; transform: translateY(14px) scale(0.96) rotate(-1deg); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes sketch-slide {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (min-width: 640px) {
+  @keyframes sketch-slide {
+    from { opacity: 0; transform: translateX(32px) rotate(1deg); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+.sketch-loader path {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 260;
+  animation: sketch-draw 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes sketch-draw {
+  from { stroke-dashoffset: 260; }
+  to { stroke-dashoffset: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sketch-pop,
+  .sketch-slide,
+  .sketch-loader path {
+    animation: none;
   }
 }

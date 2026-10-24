@@ -72,7 +72,7 @@ export default async function CaseStudyPage({ params }: PageProps) {
 
   return (
     <article className="mx-auto max-w-4xl px-6 pb-24 pt-32">
-      <Link href="/#work" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground">
+      <Link href="/classic#work" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground">
         <ArrowLeft size={14} />
         Back to work
       </Link>

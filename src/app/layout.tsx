@@ -1,12 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Caveat, Geist, Geist_Mono } from "next/font/google";
 import { profile } from "@/data/profile";
-import { UIStateProvider } from "@/components/providers/ui-state-provider";
-import { Nav } from "@/components/navigation/nav";
-import { CommandPalette } from "@/components/command-palette/command-palette";
-import { Footer } from "@/components/footer/footer";
-import { AmbientBackground } from "@/components/providers/ambient-background";
-import { CursorGlow } from "@/components/providers/cursor-glow";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -17,6 +11,12 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+const caveat = Caveat({
+  variable: "--font-caveat",
+  subsets: ["latin"],
+  weight: ["500", "700"],
 });
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://portfolio-six-bice-90.vercel.app";
@@ -92,21 +92,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${caveat.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
         />
-        <AmbientBackground />
-        <CursorGlow />
-        <UIStateProvider>
-          <Nav />
-          <main className="flex-1">{children}</main>
-          <Footer />
-          <CommandPalette />
-        </UIStateProvider>
+        {children}
       </body>
     </html>
   );
