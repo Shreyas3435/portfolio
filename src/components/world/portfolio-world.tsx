@@ -231,7 +231,7 @@ export function PortfolioWorld() {
         aria-hidden={ready}
       >
         <div className="world-loader" aria-hidden />
-        <p className="font-display text-2xl font-semibold">Painting the world…</p>
+        <p className="font-display text-2xl font-semibold">Building the world…</p>
       </div>
     </div>
   );
@@ -427,7 +427,7 @@ function ProjectDetail({ place }: { place: Place }) {
 }
 
 function WorkshopDetail({ place }: { place: Place }) {
-  const notes = ["#fff1b8", "#ffd6e8", "#d6e9ff", "#d4f2df", "#ffe0c7", "#e8dcff"];
+  const notes = ["#f3e7c4", "#dbe6ee", "#dbe9d6", "#f2dcc6", "#e4e1d8", "#e9e3c6"];
   return (
     <>
       <Heading place={place} eyebrow="More engineering" />
@@ -515,7 +515,7 @@ function AboutDetail({ place }: { place: Place }) {
 
 function SkillsDetail({ place }: { place: Place }) {
   const cats = [
-    ["ai", "AI & Search", "#8c5bd6"],
+    ["ai", "AI & Search", "#1f7a8c"],
     ["fullstack", "Full-Stack", "#3e8bff"],
     ["security", "Security", "#e5484d"],
     ["systems", "Systems & Data", "#2f9e62"],

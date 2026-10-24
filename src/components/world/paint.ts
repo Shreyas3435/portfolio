@@ -22,10 +22,10 @@ export const pick = <T,>(r: Rand, list: readonly T[]) => list[Math.floor(r() * l
 
 // Late-afternoon palette.
 export const C = {
-  grass: "#86b866",
-  grassLight: "#b5d987",
-  grassDark: "#5b9150",
-  grassDeep: "#3f7348",
+  grass: "#76a35a",
+  grassLight: "#a2c77a",
+  grassDark: "#537d46",
+  grassDeep: "#345c3c",
   path: "#e6cc9c",
   pathDark: "#c9a673",
   pathLight: "#f3e2bd",
@@ -189,35 +189,37 @@ export function text(
   ctx.restore();
 }
 
-/** Ribbon banner with a title, used under buildings and on gates. */
-export function ribbon(ctx: Ctx, x: number, y: number, label: string, color: string, size = 26) {
+/** Bolted wooden plank sign with a colour stripe, like a trail marker. */
+export function plank(ctx: Ctx, x: number, y: number, label: string, color: string, size = 24) {
+  const str = label.toUpperCase();
   ctx.font = displayFont(size, 700);
-  const w = ctx.measureText(label).width + size * 1.4;
-  const h = size * 1.45;
+  const w = ctx.measureText(str).width + size * 1.6;
+  const h = size * 1.55;
   const x0 = x - w / 2;
   const y0 = y - h / 2;
-  // Tails.
-  ctx.fillStyle = darken(color, 0.35);
-  for (const s of [-1, 1]) {
-    const tx = s < 0 ? x0 + 6 : x0 + w - 6;
+  ctx.fillStyle = "rgba(20, 30, 25, 0.35)";
+  ctx.beginPath();
+  ctx.roundRect(x0 + 3, y0 + 5, w, h, 4);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.roundRect(x0, y0, w, h, 4);
+  shade(ctx, x0, y0, x0 + w * 0.3, y0 + h, "#93633d", "#6e4729", "#4a2e1b");
+  ctx.strokeStyle = "rgba(0, 0, 0, 0.18)";
+  ctx.lineWidth = 1.2;
+  for (let k = 1; k < 4; k++) {
+    const gy = y0 + (h * k) / 4;
     ctx.beginPath();
-    ctx.moveTo(tx, y0 + 8);
-    ctx.lineTo(tx + s * h * 0.75, y0 + 8);
-    ctx.lineTo(tx + s * h * 0.5, y0 + 8 + h / 2);
-    ctx.lineTo(tx + s * h * 0.75, y0 + 8 + h);
-    ctx.lineTo(tx, y0 + 8 + h);
-    ctx.closePath();
+    ctx.moveTo(x0 + 4, gy);
+    ctx.bezierCurveTo(x0 + w * 0.3, gy - 2, x0 + w * 0.6, gy + 2, x0 + w - 4, gy);
+    ctx.stroke();
+  }
+  ctx.fillStyle = color;
+  ctx.fillRect(x0, y0 + h - 6, w, 6);
+  ctx.fillStyle = "#d8c8a4";
+  for (const bx of [x0 + 7, x0 + w - 7]) {
+    ctx.beginPath();
+    ctx.arc(bx, y0 + 7, 2.2, 0, Math.PI * 2);
     ctx.fill();
   }
-  ctx.beginPath();
-  ctx.roundRect(x0, y0, w, h, 6);
-  shade(ctx, x0, y0, x0, y0 + h, lighten(color, 0.25), color, darken(color, 0.18));
-  ctx.strokeStyle = lighten(color, 0.55);
-  ctx.globalAlpha = 0.7;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.roundRect(x0 + 4, y0 + 4, w - 8, h - 8, 4);
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-  text(ctx, label, x, y + 1, size, C.cream, { shadow: "rgba(0,0,0,0.25)" });
+  text(ctx, str, x, y - 2, size, "#fbf1dc", { shadow: "rgba(0,0,0,0.5)" });
 }

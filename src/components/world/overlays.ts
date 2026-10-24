@@ -173,7 +173,7 @@ export function drawPlaceOverlay(ctx: Ctx, p: Place, t: number, s: OverlaySprite
       break;
     case "github": {
       const flick = Math.sin(t * 13) > 0.92 ? 0.15 : 0.45;
-      glow(ctx, x, y - 104, 60, "#b18cff", flick);
+      glow(ctx, x, y - 104, 60, "#4ade80", flick);
       break;
     }
     case "email": {

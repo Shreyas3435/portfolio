@@ -72,13 +72,12 @@ interface Particle {
   text?: string;
 }
 
-interface Butterfly {
+interface Flock {
   x: number;
   y: number;
-  tx: number;
-  ty: number;
-  color: string;
-  phase: number;
+  vx: number;
+  vy: number;
+  size: number;
 }
 
 const CAR_R = 22;
@@ -88,7 +87,7 @@ const TRACK_N = 260;
 const TRACK_LIFE = 7;
 const REBUILD_AFTER = 5;
 const REGROW_AFTER = 6;
-const CONFETTI = ["#e5484d", "#f0a020", "#2f9e62", "#3e8bff", "#d6409f", "#8c5bd6"];
+const CONFETTI = ["#e5484d", "#f0a020", "#2f9e62", "#3e8bff", "#ffd34d", "#1f7a8c"];
 
 const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
 const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -135,7 +134,7 @@ export class WorldEngine {
   private lastTrack = { x: SPAWN.x, y: SPAWN.y };
   private particles: Particle[] = [];
   private bodies: Body[] = [];
-  private butterflies: Butterfly[] = [];
+  private flocks: Flock[] = [];
   private treeWob = new Float32Array(0);
   private treeVel = new Float32Array(0);
   private activeTrees = new Set<number>();
@@ -173,11 +172,11 @@ export class WorldEngine {
   }
 
   private async init() {
-    const fam = getComputedStyle(document.documentElement).getPropertyValue("--font-fraunces").trim();
-    setDisplayFamily(fam ? `${fam}, Georgia, serif` : "Georgia, serif");
+    const fam = getComputedStyle(document.documentElement).getPropertyValue("--font-barlow").trim();
+    setDisplayFamily(fam ? `${fam}, "Arial Narrow", sans-serif` : "\"Arial Narrow\", sans-serif");
     try {
       await Promise.race([
-        Promise.all([...[600, 700, 900].map((w) => document.fonts.load(displayFont(40, w))), document.fonts.load(displayFont(30, 600, true))]),
+        Promise.all([600, 700, 800].map((w) => document.fonts.load(displayFont(40, w)))),
         new Promise((res) => setTimeout(res, 2500)),
       ]);
     } catch {
@@ -188,7 +187,7 @@ export class WorldEngine {
     this.treeWob = new Float32Array(this.world.standing.length);
     this.treeVel = new Float32Array(this.world.standing.length);
     this.spawnBodies();
-    this.spawnButterflies();
+    this.spawnFlocks();
     this.resize();
     this.ensureTiles(Infinity);
     this.render();
@@ -379,14 +378,11 @@ export class WorldEngine {
     add("ball", 1890, 1460);
   }
 
-  private spawnButterflies() {
+  private spawnFlocks() {
     const r = mulberry32(55);
-    const colors = ["#ffd34d", "#ff9ec7", "#ffffff", "#9fd3ff", "#ffb347"];
-    for (let i = 0; i < 9; i++) {
-      const d = districts[i % districts.length].court;
-      const x = d.x + (r() - 0.5) * d.rx * 2.4;
-      const y = d.y + (r() - 0.5) * d.ry * 2.4;
-      this.butterflies.push({ x, y, tx: x, ty: y, color: colors[i % colors.length], phase: r() * 6 });
+    for (let i = 0; i < 3; i++) {
+      const a = r() * Math.PI * 2;
+      this.flocks.push({ x: r() * WORLD_W, y: r() * WORLD_H, vx: Math.cos(a) * 70, vy: Math.sin(a) * 40, size: 4 + Math.floor(r() * 3) });
     }
   }
 
@@ -407,8 +403,8 @@ export class WorldEngine {
     this.spawn({ kind: "text", x, y, vy: -40, max: 1.1, size, color, text: str, rot: (Math.random() - 0.5) * 0.25 });
   }
 
-  private leaves(x: number, y: number, n: number, blossom: boolean) {
-    const cols = blossom ? ["#f7c2d6", "#ffe3ee", "#e88bb0"] : ["#88c262", "#5a9548", "#b5d987"];
+  private leaves(x: number, y: number, n: number, autumn: boolean) {
+    const cols = autumn ? ["#c4561f", "#e8892f", "#9c3d18"] : ["#7fb35a", "#527f43", "#a7c977"];
     for (let i = 0; i < n; i++) {
       this.spawn({
         kind: "leaf",
@@ -746,7 +742,7 @@ export class WorldEngine {
         if (c.ref.type === "tree") {
           this.kickTree(c.ref.i, -vn / 260);
           const s = this.world.standing[c.ref.i];
-          if (-vn > 90) this.leaves(s.x, s.y, this.quality ? 3 : 7, s.kind === "blossom");
+          if (-vn > 90) this.leaves(s.x, s.y, this.quality ? 3 : 7, s.kind === "maple");
         } else if (c.ref.type === "place") {
           this.placeVel[c.ref.i] += -vn / 180;
         }
@@ -771,7 +767,7 @@ export class WorldEngine {
     if (!this.reduced) this.shake = Math.min(10, impact / 50);
     if (this.t - this.lastBonk > 0.6) {
       this.lastBonk = this.t;
-      this.say(["bonk!", "oof", "boop!", "whoops", "thud"][Math.floor(Math.random() * 5)], this.car.x, this.car.y - 50);
+      this.say(["bam!", "oof", "thud", "whoa", "crunch"][Math.floor(Math.random() * 5)], this.car.x, this.car.y - 50);
     }
   }
 
@@ -925,7 +921,7 @@ export class WorldEngine {
     else if (!this.strike.firstKnock) this.strike.firstKnock = this.t;
     if (!this.strike.done && knocked >= 9 && this.t - this.strike.firstKnock < 4) {
       this.strike.done = true;
-      this.say("STRIKE!", BOWLING.x, BOWLING.y - 60, "#cf4f97", 64);
+      this.say("STRIKE!", BOWLING.x, BOWLING.y - 60, "#d9622b", 64);
       for (let i = 0; i < (this.quality ? 14 : 36); i++) {
         const a = Math.random() * Math.PI * 2;
         const s = 120 + Math.random() * 260;
@@ -980,29 +976,22 @@ export class WorldEngine {
 
   private updateAmbient(dt: number) {
     if (this.quality > 0 || this.reduced || !this.world) return;
-    // Petals drift from cherry trees near the camera.
+    // Autumn leaves drift from maples near the camera.
     const { left, top, vw, vh } = this.view();
     if (Math.random() < 0.12) {
       const st = this.world.standing;
       const s = st[Math.floor(Math.random() * st.length)];
-      if (s.kind === "blossom" && s.x > left - 100 && s.x < left + vw + 100 && s.y > top - 100 && s.y < top + vh + 200) {
+      if (s.kind === "maple" && s.x > left - 100 && s.x < left + vw + 100 && s.y > top - 100 && s.y < top + vh + 200) {
         this.leaves(s.x, s.y, 1, true);
       }
     }
-    for (const b of this.butterflies) {
-      if (Math.hypot(b.tx - b.x, b.ty - b.y) < 12 || Math.random() < 0.005) {
-        b.tx = b.x + (Math.random() - 0.5) * 260;
-        b.ty = b.y + (Math.random() - 0.5) * 180;
-      }
-      const flee = Math.hypot(this.car.x - b.x, this.car.y - b.y) < 90;
-      if (flee) {
-        b.tx = b.x + (b.x - this.car.x) * 2;
-        b.ty = b.y + (b.y - this.car.y) * 2;
-      }
-      const sp = flee ? 160 : 45;
-      const d = Math.hypot(b.tx - b.x, b.ty - b.y) || 1;
-      b.x = clamp(b.x + ((b.tx - b.x) / d) * sp * dt, EDGE, WORLD_W - EDGE);
-      b.y = clamp(b.y + ((b.ty - b.y) / d) * sp * dt, EDGE, WORLD_H - EDGE);
+    for (const f of this.flocks) {
+      f.x += f.vx * dt;
+      f.y += f.vy * dt;
+      if (f.x < -300) f.x = WORLD_W + 300;
+      if (f.x > WORLD_W + 300) f.x = -300;
+      if (f.y < -300) f.y = WORLD_H + 300;
+      if (f.y > WORLD_H + 300) f.y = -300;
     }
   }
 
@@ -1043,7 +1032,7 @@ export class WorldEngine {
     const ox = Math.round(-(left + shakeX) * S);
     const oy = Math.round(-(top + shakeY) * S);
 
-    ctx.fillStyle = "#86b866";
+    ctx.fillStyle = "#76a35a";
     for (let tx = Math.floor(left / TILE); tx <= Math.floor((left + vw) / TILE); tx++)
       for (let ty = Math.floor(top / TILE); ty <= Math.floor((top + vh) / TILE); ty++) {
         const tile = this.tiles.get(`${tx},${ty}`);
@@ -1164,7 +1153,7 @@ export class WorldEngine {
     }
 
     ctx.setTransform(S, 0, 0, S, ox, oy);
-    this.drawButterflies(left, top, vw, vh);
+    this.drawFlocks(left, top, vw, vh);
     this.drawParticles();
     if (!this.quality && !this.reduced) this.drawCloudShadows(left, top, vw, vh);
   }
@@ -1241,25 +1230,31 @@ export class WorldEngine {
     ctx.drawImage(this.sprite("car", CAR_BOX, paintCar), -CAR_BOX.ax, -CAR_BOX.ay, CAR_BOX.w, CAR_BOX.h);
   }
 
-  private drawButterflies(left: number, top: number, vw: number, vh: number) {
+  private drawFlocks(left: number, top: number, vw: number, vh: number) {
     if (this.quality || this.reduced) return;
     const ctx = this.ctx;
-    for (const b of this.butterflies) {
-      if (b.x < left || b.x > left + vw || b.y < top || b.y > top + vh) continue;
-      const flap = Math.abs(Math.sin(this.t * 14 + b.phase));
-      const by = b.y - 30 - Math.sin(this.t * 2 + b.phase) * 6;
-      ctx.fillStyle = "rgba(24,48,44,0.15)";
-      ctx.beginPath();
-      ctx.ellipse(b.x, b.y, 4, 1.6, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = b.color;
-      for (const s of [-1, 1]) {
+    for (const f of this.flocks) {
+      if (f.x < left - 200 || f.x > left + vw + 200 || f.y < top - 200 || f.y > top + vh + 300) continue;
+      const heading = Math.atan2(f.vy, f.vx);
+      for (let k = 0; k < f.size; k++) {
+        // V formation behind the leader.
+        const row = Math.ceil(k / 2);
+        const side = k % 2 ? 1 : -1;
+        const bx = f.x - Math.cos(heading) * row * 26 + Math.sin(heading) * side * row * 22;
+        const by = f.y - Math.sin(heading) * row * 26 - Math.cos(heading) * side * row * 22;
+        const flap = Math.sin(this.t * 9 + k * 1.3) * 5;
+        ctx.fillStyle = "rgba(24, 48, 44, 0.12)";
         ctx.beginPath();
-        ctx.ellipse(b.x + s * 4 * flap, by, 4.5 * flap + 0.8, 3.5, s * 0.4, 0, Math.PI * 2);
+        ctx.ellipse(bx + 40, by + 150, 9, 3, 0, 0, Math.PI * 2);
         ctx.fill();
+        ctx.strokeStyle = "#26302d";
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.moveTo(bx - 11, by - flap);
+        ctx.quadraticCurveTo(bx - 5, by - 5, bx, by);
+        ctx.quadraticCurveTo(bx + 5, by - 5, bx + 11, by - flap);
+        ctx.stroke();
       }
-      ctx.fillStyle = "#3a2f2a";
-      ctx.fillRect(b.x - 0.8, by - 3, 1.6, 6);
     }
   }
 

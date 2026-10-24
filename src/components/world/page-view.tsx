@@ -13,7 +13,7 @@ import { placeById } from "./places";
 const levelLabel = { core: "Core", strong: "Strong", working: "Working", exploring: "Exploring" } as const;
 const levelDots = { core: 4, strong: 3, working: 2, exploring: 1 } as const;
 const categoryInfo = {
-  ai: { label: "AI & Search", color: "#8c5bd6" },
+  ai: { label: "AI & Search", color: "#1f7a8c" },
   fullstack: { label: "Full-Stack", color: "#3e8bff" },
   security: { label: "Security", color: "#e5484d" },
   systems: { label: "Systems & Data", color: "#2f9e62" },
@@ -88,9 +88,9 @@ function Hero({ onExplore }: { onExplore: () => void }) {
         <path d="M0 380 C 180 280, 320 300, 480 340 S 820 250, 1000 300 S 1300 260, 1440 320 V560 H0 Z" fill="url(#pv-h1)" opacity="0.8" />
         <path d="M0 430 C 200 380, 380 400, 560 420 S 900 360, 1120 400 S 1340 380, 1440 400 V560 H0 Z" fill="url(#pv-h2)" />
         <path d="M0 490 C 240 460, 480 480, 720 470 S 1180 450, 1440 480 V560 H0 Z" fill="url(#pv-h3)" />
-        <g fill="#f7c2d6">
-          {[[120, 440], [180, 450], [1260, 420], [1320, 430], [1290, 410]].map(([x, y]) => (
-            <circle key={`${x}-${y}`} cx={x} cy={y} r="26" opacity="0.9" />
+        <g fill="#2f5a40">
+          {[[90, 470, 1], [140, 480, 0.8], [190, 470, 1.15], [1230, 450, 1], [1285, 440, 1.25], [1345, 455, 0.9]].map(([x, y, k]) => (
+            <path key={`${x}-${y}`} d={`M${x} ${y - 110 * k} L${x + 34 * k} ${y} L${x - 34 * k} ${y} Z`} />
           ))}
         </g>
       </svg>
@@ -98,11 +98,11 @@ function Hero({ onExplore }: { onExplore: () => void }) {
         <p className="pv-pill w-fit">
           <span className="pv-dot" /> Open to work & collaborations
         </p>
-        <h1 className="font-display mt-5 text-5xl leading-[0.95] font-semibold text-[#21302c] sm:text-7xl">{profile.name}</h1>
+        <h1 className="font-display mt-5 text-6xl leading-[0.9] font-bold tracking-tight text-[#21302c] uppercase sm:text-8xl">{profile.name}</h1>
         <p className="font-display mt-3 text-xl text-[#2c3a36] italic sm:text-2xl">{profile.role}</p>
         <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-[#2c3a36] sm:text-base">{profile.heroLine}</p>
         <div className="mt-7 flex flex-wrap gap-2">
-          <a href={`mailto:${profile.email}`} className="wv-btn wv-btn-solid" style={{ background: "#e0703f" }}>
+          <a href={`mailto:${profile.email}`} className="wv-btn wv-btn-solid" style={{ background: "#d9622b" }}>
             <Mail size={16} /> Get in touch
           </a>
           <a href={profile.resumeUrl} target="_blank" rel="noreferrer noopener" className="wv-btn">
@@ -133,7 +133,7 @@ function Intro() {
   return (
     <section className="pv-section grid gap-8 sm:grid-cols-[1.4fr_1fr]">
       <div>
-        <SectionTitle eyebrow="Hello" title="What I build" color="#e0703f" />
+        <SectionTitle eyebrow="Hello" title="What I build" color="#d9622b" />
         <p className="text-[15px] leading-relaxed">{profile.heroSupport}</p>
         <p className="mt-3 text-[15px] leading-relaxed">{profile.howIThink}</p>
         <ul className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -178,11 +178,11 @@ function Intro() {
 function Projects() {
   return (
     <section className="pv-section">
-      <SectionTitle eyebrow="Flagship work" title="Projects" color="#e0703f" />
+      <SectionTitle eyebrow="Flagship work" title="Projects" color="#d9622b" />
       <div className="grid gap-5 md:grid-cols-2">
         {flagshipProjects.map((p) => {
           const place = placeById(p.id);
-          const color = place?.color ?? "#e0703f";
+          const color = place?.color ?? "#d9622b";
           const ink = place?.ink ?? "#2c3a36";
           return (
             <article key={p.id} className="pv-card pv-project flex flex-col overflow-hidden" style={{ ["--c" as string]: color }}>
@@ -231,10 +231,10 @@ function Projects() {
 }
 
 function MoreWork() {
-  const notes = ["#fff1b8", "#ffd6e8", "#d6e9ff", "#d4f2df", "#ffe0c7", "#e8dcff"];
+  const notes = ["#f3e7c4", "#dbe6ee", "#dbe9d6", "#f2dcc6", "#e4e1d8", "#e9e3c6"];
   return (
     <section className="pv-section">
-      <SectionTitle eyebrow="The workshop" title="More builds & experiments" color="#d6409f" />
+      <SectionTitle eyebrow="The workshop" title="More builds & experiments" color="#5b7083" />
       <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {secondaryProjects.map((p, i) => (
           <li key={p.id} className="pv-note" style={{ background: notes[i % notes.length] }}>
@@ -275,7 +275,7 @@ function Skills() {
   const cats = Object.keys(categoryInfo) as (keyof typeof categoryInfo)[];
   return (
     <section className="pv-section">
-      <SectionTitle eyebrow="The skill tree" title="What I work with" color="#8c5bd6" />
+      <SectionTitle eyebrow="The skill tree" title="What I work with" color="#1f7a8c" />
       <div className="grid gap-4 sm:grid-cols-2">
         {cats.map((c) => (
           <div key={c} className="pv-card p-5">
@@ -341,7 +341,7 @@ function Contact({ onExplore }: { onExplore: () => void }) {
           Full-time roles, freelance projects or a collaboration on something ambitious — I&apos;d love to hear about it.
         </p>
         <div className="mt-6 flex flex-wrap gap-2">
-          <a href={`mailto:${profile.email}`} className="wv-btn wv-btn-solid" style={{ background: "#e0703f" }}>
+          <a href={`mailto:${profile.email}`} className="wv-btn wv-btn-solid" style={{ background: "#d9622b" }}>
             <Mail size={16} /> {profile.email}
           </a>
           <a href={profile.linkedin} target="_blank" rel="noreferrer noopener" className="wv-btn">

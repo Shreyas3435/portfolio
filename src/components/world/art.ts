@@ -13,7 +13,7 @@ import {
   polyPath,
   range,
   rgba,
-  ribbon,
+  plank,
   shade,
   softShadow,
   text,
@@ -33,19 +33,19 @@ export interface SpriteBox {
 // Nature
 // ---------------------------------------------------------------------------
 
-export type Foliage = "tree" | "tree2" | "blossom" | "pine" | "bush" | "rock";
+export type Foliage = "tree" | "tree2" | "maple" | "pine" | "bush" | "rock";
 
 const TONES = {
-  tree: ["#2c5a43", "#4a8a52", "#88c262", "#d8f09e"],
-  tree2: ["#3a5e34", "#679a45", "#a9d066", "#ecf5a8"],
-  blossom: ["#b9577f", "#e88bb0", "#f7c2d6", "#fff1f6"],
+  tree: ["#244c39", "#3f7a48", "#77ad55", "#c6e08e"],
+  tree2: ["#33532e", "#5a8a3d", "#94bd5a", "#dbe9a0"],
+  maple: ["#7a3418", "#c4561f", "#e8892f", "#ffd08a"],
   pine: ["#1d4639", "#2f6a4c", "#4f8f5a", "#a3cf7e"],
 } as const;
 
 export const FOLIAGE_BOX: Record<Foliage, SpriteBox> = {
   tree: { w: 120, h: 140, ax: 60, ay: 122 },
   tree2: { w: 120, h: 140, ax: 60, ay: 122 },
-  blossom: { w: 124, h: 140, ax: 62, ay: 122 },
+  maple: { w: 124, h: 140, ax: 62, ay: 122 },
   pine: { w: 90, h: 150, ax: 45, ay: 136 },
   bush: { w: 76, h: 56, ax: 38, ay: 44 },
   rock: { w: 64, h: 48, ax: 32, ay: 36 },
@@ -69,7 +69,7 @@ export function paintFoliage(ctx: Ctx, kind: Foliage, r: Rand) {
     clump(ctx, 14, -14, 14, r, t);
     clump(ctx, 0, -22, 16, r, t);
     if (r() < 0.5) {
-      const c = ["#ff9ec7", "#fff1c4", "#c9a7ff", "#ff8a6b"][Math.floor(r() * 4)];
+      const c = ["#ffe08a", "#fff6e0", "#ff9a3d", "#ffd34d"][Math.floor(r() * 4)];
       ctx.fillStyle = c;
       for (let i = 0; i < 6; i++) {
         ctx.beginPath();
@@ -135,11 +135,11 @@ export function paintFoliage(ctx: Ctx, kind: Foliage, r: Rand) {
     [14, -56, 20],
   ];
   for (const [x, y, s] of clumps) clump(ctx, x + range(r, -3, 3), y + range(r, -3, 3), s * range(r, 0.92, 1.08), r, tones);
-  if (kind === "blossom") {
-    ctx.fillStyle = "#fff6fa";
-    for (let i = 0; i < 14; i++) {
+  if (kind === "maple") {
+    ctx.fillStyle = "#ffcf6e";
+    for (let i = 0; i < 10; i++) {
       ctx.beginPath();
-      ctx.arc(range(r, -38, 38), range(r, -104, -44), range(r, 1.2, 2.4), 0, Math.PI * 2);
+      ctx.ellipse(range(r, -38, 38), range(r, -104, -44), 2.6, 1.6, range(r, 0, 3), 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -161,7 +161,7 @@ export const PROP_BOX: Record<PropKind, SpriteBox> = {
 export const PROP_DEBRIS: Record<PropKind, string[]> = {
   lamp: ["#2f4a46", "#ffd88a", "#3d5c57"],
   fence: ["#b07c50", "#8a5d3a", "#cf9d6c"],
-  pot: ["#c8653f", "#e08657", "#6aa84f", "#ff9ec7"],
+  pot: ["#c8653f", "#e08657", "#6aa84f", "#ffd34d"],
   barrel: ["#9a6a40", "#6e4a2c", "#4a4a4a"],
 };
 
@@ -213,7 +213,7 @@ export function paintProp(ctx: Ctx, kind: PropKind, r: Rand) {
     }
     case "pot": {
       softShadow(ctx, 4, 2, 15, 5, 0.3);
-      const flower = ["#ff9ec7", "#ffd34d", "#c9a7ff", "#ff7a5c", "#fff6e0"][Math.floor(r() * 5)];
+      const flower = ["#ffd34d", "#ff8a3d", "#fff6e0", "#e8552a", "#ffe08a"][Math.floor(r() * 5)];
       clump(ctx, 0, -26, 11, r, TONES.tree2);
       ctx.fillStyle = flower;
       for (let i = 0; i < 6; i++) {
@@ -290,7 +290,7 @@ export function paintGate(ctx: Ctx, d: District) {
     ctx.lineTo(x, -136);
     ctx.stroke();
   }
-  ribbon(ctx, 0, -118, d.name, d.color, 30);
+  plank(ctx, 0, -118, d.name, d.color, 30);
 }
 
 export const DECOR_BOX = {
@@ -488,7 +488,7 @@ function windowPane(ctx: Ctx, x: number, y: number, w: number, h: number, lit: b
   if (r() < 0.6) {
     ctx.fillStyle = C.woodDark;
     ctx.fillRect(x - 4, y + h + 3, w + 8, 6);
-    const c = ["#ff9ec7", "#ffd34d", "#ff7a5c", "#c9a7ff"][Math.floor(r() * 4)];
+    const c = ["#ffd34d", "#ff8a3d", "#fff6e0", "#e8552a"][Math.floor(r() * 4)];
     for (let i = 0; i < 5; i++) {
       ctx.fillStyle = i % 2 ? "#5b9150" : c;
       ctx.beginPath();
@@ -603,7 +603,7 @@ const lighthouse: Painter = (ctx, r, p) => {
   ctx.arc(0, top - 104, 5, 0, Math.PI * 2);
   ctx.fill();
   grassFoot(ctx, -110, 110, r);
-  ribbon(ctx, 0, 44, p.title, p.color, 26);
+  plank(ctx, 0, 44, p.title, p.color, 26);
 };
 
 const factory: Painter = (ctx, r, p) => {
@@ -666,13 +666,13 @@ const factory: Painter = (ctx, r, p) => {
   ctx.stroke();
   signBoard(ctx, -120, -54, "M14 ≠ M24", "#3f8f86", 16);
   grassFoot(ctx, -180, 190, r);
-  ribbon(ctx, 0, 44, p.title, p.color, 26);
+  plank(ctx, 0, 44, p.title, p.color, 26);
 };
 
 const workshopShed: Painter = (ctx, r, p) => {
   softShadow(ctx, 20, 6, 160, 26, 0.32);
-  const plank = "#e2c9a2";
-  wall(ctx, -130, -150, 260, 150, plank);
+  const boards = "#e2c9a2";
+  wall(ctx, -130, -150, 260, 150, boards);
   ctx.strokeStyle = rgba("#7a5233", 0.25);
   ctx.lineWidth = 1.2;
   for (let x = -120; x < 130; x += 16) {
@@ -681,13 +681,13 @@ const workshopShed: Painter = (ctx, r, p) => {
     ctx.lineTo(x, -2);
     ctx.stroke();
   }
-  sideWall(ctx, 130, -150, 150, 24, plank);
+  sideWall(ctx, 130, -150, 150, 24, boards);
   roof(ctx, -130, 130, -150, 64, 24, p.color, r, 0.12);
   // Open front with a pinboard of sticky notes.
   ctx.beginPath();
   ctx.rect(-104, -128, 208, 96);
   shade(ctx, -104, -128, 104, -32, "#c8a06c", "#b08654", "#8a6238");
-  const notes = ["#ffd166", "#ff8fc7", "#8ec5ff", "#7fdba6", "#ffab70", "#c6a7ff"];
+  const notes = ["#ffd166", "#9fc4e8", "#a7d9b5", "#ffb06b", "#d9d4c7", "#f2e08c"];
   notes.forEach((c, i) => {
     const x = -92 + (i % 3) * 66 + range(r, -3, 3);
     const y = -120 + Math.floor(i / 3) * 44 + range(r, -2, 2);
@@ -715,7 +715,7 @@ const workshopShed: Painter = (ctx, r, p) => {
   ctx.fillRect(-114, -20, 8, 20);
   ctx.fillRect(106, -20, 8, 20);
   grassFoot(ctx, -140, 150, r);
-  ribbon(ctx, 0, 44, p.title, p.color, 26);
+  plank(ctx, 0, 44, p.title, p.color, 26);
 };
 
 const library: Painter = (ctx, r, p) => {
@@ -776,7 +776,7 @@ const library: Painter = (ctx, r, p) => {
     shade(ctx, x, 0, x + w, 0, lighten(c, 0.25), c, darken(c, 0.3));
   });
   grassFoot(ctx, -190, 190, r);
-  ribbon(ctx, 0, 44, p.title, p.color, 26);
+  plank(ctx, 0, 44, p.title, p.color, 26);
 };
 
 const lodge: Painter = (ctx, r, p) => {
@@ -840,7 +840,7 @@ const lodge: Painter = (ctx, r, p) => {
     ctx.restore();
   }
   grassFoot(ctx, -200, 200, r);
-  ribbon(ctx, 0, 44, p.title, p.color, 26);
+  plank(ctx, 0, 44, p.title, p.color, 26);
 };
 
 const house = (opts: { wallColor: string; extra?: (ctx: Ctx, r: Rand, p: Place) => void; signLabel?: string }): Painter => (ctx, r, p) => {
@@ -854,7 +854,7 @@ const house = (opts: { wallColor: string; extra?: (ctx: Ctx, r: Rand, p: Place) 
   if (opts.signLabel) signBoard(ctx, 0, -104, opts.signLabel, darken(p.color, 0.15), 17);
   opts.extra?.(ctx, r, p);
   grassFoot(ctx, -110, 120, r);
-  ribbon(ctx, 0, 40, p.title, p.color, 24);
+  plank(ctx, 0, 40, p.title, p.color, 24);
 };
 
 const postOffice = house({
@@ -877,11 +877,11 @@ const postOffice = house({
 });
 
 const forge = house({
-  wallColor: "#5b5470",
+  wallColor: "#4a5058",
   extra: (ctx, r) => {
-    // Neon "</>" sign.
-    glow(ctx, 0, -104, 46, "#b18cff", 0.55);
-    text(ctx, "</>", 0, -104, 26, "#efe4ff", { shadow: "rgba(124,77,255,0.8)" });
+    // Terminal-green "</>" sign.
+    glow(ctx, 0, -104, 46, "#4ade80", 0.45);
+    text(ctx, "</>", 0, -104, 26, "#e7ffef", { shadow: "rgba(34,197,94,0.9)" });
     // Contribution graph banner.
     const greens = ["#1b3a2a", "#2f6a3f", "#3fa35a", "#69d07f"];
     for (let i = 0; i < 7; i++)
@@ -922,7 +922,7 @@ const kiosk: Painter = (ctx, r, p) => {
   }
   signBoard(ctx, 0, -32, "CV · PDF", darken(p.color, 0.2), 16);
   grassFoot(ctx, -110, 110, r);
-  ribbon(ctx, 0, 40, p.title, p.color, 24);
+  plank(ctx, 0, 40, p.title, p.color, 24);
 };
 
 const cottage = house({
@@ -934,7 +934,7 @@ const cottage = house({
     shade(ctx, 52, 0, 74, 0, "#d9a07a", "#b9764f", "#8a4f2f");
     windowPane(ctx, -12, -170, 24, 24, true, () => 0.9, true);
     for (let i = 0; i < 9; i++) {
-      const c = ["#ff9ec7", "#ffd34d", "#ff7a5c", "#c9a7ff", "#fff6e0"][i % 5];
+      const c = ["#ffd34d", "#ff8a3d", "#fff6e0", "#e8552a", "#ffe08a"][i % 5];
       ctx.fillStyle = "#5b9150";
       ctx.beginPath();
       ctx.arc(-160 + i * 8, -6 + (i % 2) * 4, 5, 0, Math.PI * 2);
@@ -958,7 +958,7 @@ const skillTree: Painter = (ctx, r, p) => {
   ctx.quadraticCurveTo(0, -12, -40, 0);
   ctx.closePath();
   shade(ctx, -40, 0, 44, 0, "#b48a60", "#7a5436", "#46301f");
-  const tones = ["#6a4f9c", "#9a7fd6", "#cdb8f4", "#f6efff"] as const;
+  const tones = ["#1f4d4a", "#2f6f6a", "#56a098", "#bfe6dc"] as const;
   const clumps: [number, number, number][] = [
     [0, -320, 60], [-90, -280, 54], [90, -284, 54], [-130, -210, 46], [130, -214, 46],
     [-60, -220, 56], [60, -224, 56], [0, -236, 58],
@@ -976,16 +976,16 @@ const skillTree: Painter = (ctx, r, p) => {
   ctx.fillStyle = C.woodDark;
   ctx.fillRect(-102, -62, 52, 7);
   grassFoot(ctx, -150, 150, r);
-  ribbon(ctx, 0, 44, p.title, p.color, 26);
+  plank(ctx, 0, 44, p.title, p.color, 26);
 };
 
 /** Where the skill tree's lanterns hang (overlay pulses them). */
 export const LANTERNS: [number, number, string][] = [
-  [-110, -250, "#ff8a6b"],
+  [-110, -250, "#ffb347"],
   [-40, -300, "#ffd34d"],
-  [50, -310, "#7fdba6"],
-  [120, -248, "#8ec5ff"],
-  [-20, -210, "#ff9ec7"],
+  [50, -310, "#7fe0d0"],
+  [120, -248, "#ffb347"],
+  [-20, -210, "#8ed8ff"],
   [80, -200, "#ffd34d"],
 ];
 
@@ -1099,23 +1099,29 @@ export function paintBody(ctx: Ctx, kind: BodyKind, char = "") {
       break;
     }
     case "ball": {
-      const cols = ["#e5484d", "#ffd34d", "#2f9e62", "#3e8bff", "#d6409f", "#f6f1e7"];
-      for (let i = 0; i < 6; i++) {
-        ctx.fillStyle = cols[i];
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.arc(0, 0, 24, (i / 6) * Math.PI * 2, ((i + 1) / 6) * Math.PI * 2);
-        ctx.closePath();
-        ctx.fill();
-      }
-      const g = ctx.createRadialGradient(-8, -8, 2, 0, 0, 26);
-      g.addColorStop(0, "rgba(255,255,255,0.6)");
-      g.addColorStop(0.5, "rgba(255,255,255,0)");
-      g.addColorStop(1, "rgba(0,0,0,0.3)");
-      ctx.fillStyle = g;
       ctx.beginPath();
       ctx.arc(0, 0, 24, 0, Math.PI * 2);
-      ctx.fill();
+      shade(ctx, -24, -24, 24, 24, "#ffffff", "#eeeeea", "#a9a9a4");
+      ctx.fillStyle = "#26292c";
+      const patch = (cx: number, cy: number, rad: number) => {
+        ctx.beginPath();
+        for (let k = 0; k < 5; k++) {
+          const a = (k / 5) * Math.PI * 2 - Math.PI / 2;
+          ctx.lineTo(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad);
+        }
+        ctx.closePath();
+        ctx.fill();
+      };
+      patch(0, 0, 8);
+      for (let k = 0; k < 5; k++) {
+        const a = (k / 5) * Math.PI * 2 + Math.PI / 2;
+        patch(Math.cos(a) * 19, Math.sin(a) * 19, 5);
+      }
+      ctx.strokeStyle = "#26292c";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 23.5, 0, Math.PI * 2);
+      ctx.stroke();
       break;
     }
     case "brick": {
@@ -1127,7 +1133,7 @@ export function paintBody(ctx: Ctx, kind: BodyKind, char = "") {
       break;
     }
     case "letter": {
-      ctx.font = displayFont(76, 900);
+      ctx.font = displayFont(84, 800);
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       // Extruded block letter: a stack of darker copies, then the face.
@@ -1136,8 +1142,9 @@ export function paintBody(ctx: Ctx, kind: BodyKind, char = "") {
         ctx.fillText(char, i * 0.6, i * 1.1 + 4);
       }
       const g = ctx.createLinearGradient(0, -34, 0, 34);
-      g.addColorStop(0, "#fffdf6");
-      g.addColorStop(1, "#f3e3c3");
+      g.addColorStop(0, "#fbf8f0");
+      g.addColorStop(0.55, "#e9e2d2");
+      g.addColorStop(1, "#e08a4a");
       ctx.fillStyle = g;
       ctx.fillText(char, 0, 4);
       break;
@@ -1145,5 +1152,5 @@ export function paintBody(ctx: Ctx, kind: BodyKind, char = "") {
   }
 }
 
-const LETTER_SIDE = ["#f2855f", "#ec7a56", "#e56f4d", "#de6444", "#d65a3c", "#cf5034", "#c8492f"];
-const mixDepth = (i: number) => LETTER_SIDE[i - 1] ?? "#c8492f";
+const LETTER_SIDE = ["#6b7b85", "#63737d", "#5b6b75", "#53636d", "#4b5b65", "#43535d", "#3b4b55"];
+const mixDepth = (i: number) => LETTER_SIDE[i - 1] ?? "#3b4b55";

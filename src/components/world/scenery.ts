@@ -121,7 +121,7 @@ export function buildWorld(): WorldData {
   scatter("tree", 90, { spacing: 54, where: nearEdge });
   scatter("tree", 60, { spacing: 60 });
   scatter("tree2", 60, { spacing: 60 });
-  scatter("blossom", 30, { spacing: 70, where: nearDistrict });
+  scatter("maple", 30, { spacing: 70, where: nearDistrict });
   scatter("pine", 60, { spacing: 46 });
   scatter("rock", 34, { spacing: 40, sMin: 0.7, sMax: 1.4 });
   scatter("bush", 90, { pad: 0, sMin: 0.8, sMax: 1.2 });
@@ -129,7 +129,7 @@ export function buildWorld(): WorldData {
 
   const colliders: Collider[] = [];
   standing.forEach((s, i) => {
-    if (s.kind === "tree" || s.kind === "tree2" || s.kind === "blossom") colliders.push({ x: s.x, y: s.y - 8 * s.s, r: 16 * s.s, ref: { type: "tree", i } });
+    if (s.kind === "tree" || s.kind === "tree2" || s.kind === "maple") colliders.push({ x: s.x, y: s.y - 8 * s.s, r: 16 * s.s, ref: { type: "tree", i } });
     else if (s.kind === "pine") colliders.push({ x: s.x, y: s.y - 6 * s.s, r: 13 * s.s, ref: { type: "tree", i } });
     else if (s.kind === "rock") colliders.push({ x: s.x, y: s.y - 10 * s.s, r: 18 * s.s, ref: { type: "solid" } });
   });
@@ -206,7 +206,7 @@ export function buildWorld(): WorldData {
     const s = range(r, 90, 260);
     addFlat({ kind: "blotch", x: range(r, 0, WORLD_W), y: range(r, 0, WORLD_H), s, seed: 0, color: pick(r, blotchColors) }, s);
   }
-  const flowerColors = ["#fff6e0", "#ffd34d", "#ff9ec7", "#c9a7ff", "#ff8a6b", "#ffffff"];
+  const flowerColors = ["#fff6e0", "#ffd34d", "#ff9a3d", "#ffffff", "#e8c547", "#9fc4e8"];
   for (let placed = 0, tries = 0; placed < 300 && tries < 6000; tries++) {
     const x = range(r, 0, WORLD_W);
     const y = range(r, 0, WORLD_H);
@@ -396,7 +396,7 @@ function paintPond(ctx: Ctx, p: (typeof PONDS)[number]) {
     ctx.closePath();
     ctx.fill();
     if (i === 2) {
-      ctx.fillStyle = "#ffb3cf";
+      ctx.fillStyle = "#fff6e0";
       ctx.beginPath();
       ctx.arc(x + 2, y - 3, 4, 0, Math.PI * 2);
       ctx.fill();
@@ -495,7 +495,7 @@ export function renderTile(w: WorldData, tx: number, ty: number, scale: number):
   // runs across tile edges without seams.
   const strokes: [number, number, number, number, number][] = [];
   for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) strokesFor(tx + dx, ty + dy, strokes);
-  const strokeColors = [rgba("#c9e69c", 0.55), rgba("#4b8247", 0.35), rgba("#a5d27a", 0.5)];
+  const strokeColors = [rgba("#b5d48a", 0.5), rgba("#3f6f3d", 0.38), rgba("#94bf6c", 0.45)];
   ctx.lineCap = "round";
   ctx.lineWidth = 1.8;
   for (let k = 0; k < 3; k++) {
@@ -560,7 +560,7 @@ export function renderTile(w: WorldData, tx: number, ty: number, scale: number):
   }
 
   if (intersects([TAGLINE.x - 520, TAGLINE.y - 40, TAGLINE.x + 520, TAGLINE.y + 40], x0, y0, x1, y1)) {
-    text(ctx, TAGLINE.text, TAGLINE.x, TAGLINE.y, 30, "#fffaf0", { italic: true, weight: 600, shadow: "rgba(30,60,40,0.45)" });
+    text(ctx, TAGLINE.text.toUpperCase(), TAGLINE.x, TAGLINE.y, 30, "#fffaf0", { weight: 600, shadow: "rgba(30,60,40,0.45)" });
   }
   return c;
 }
