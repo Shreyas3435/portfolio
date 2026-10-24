@@ -99,7 +99,7 @@ body {
   --ink-soft: #56645f;
   --ink-faint: rgba(38, 51, 47, 0.18);
   --card: #fffaf0;
-  background: #5cb85c;
+  background: #6b8d3d;
   color: var(--ink);
   color-scheme: light;
   -webkit-tap-highlight-color: transparent;
@@ -253,7 +253,7 @@ body {
 }
 
 .world-loading {
-  background: linear-gradient(180deg, #4fb8ff, #a9e2ff 55%, #5cb85c);
+  background: linear-gradient(180deg, #0f172a, #1e293b);
 }
 
 .world-loader {
@@ -425,9 +425,30 @@ body {
   }
 }
 
-  /* Hero text sits on the skyline; keep it legible in both modes. */
+  /* Hero text sits on the skyline; a scrim keeps it legible in both modes. */
   .pv-hero-ink {
-    color: #10233a;
+    color: #0b1524;
+  }
+
+  .pv-scrim {
+    background:
+      linear-gradient(90deg, rgba(244, 247, 251, 0.94) 0%, rgba(244, 247, 251, 0.82) 34%, rgba(244, 247, 251, 0.35) 58%, rgba(244, 247, 251, 0) 78%),
+      linear-gradient(180deg, rgba(244, 247, 251, 0) 60%, rgba(244, 247, 251, 0.5) 100%);
+  }
+
+  .world-root[data-mode="night"] .pv-scrim {
+    background:
+      linear-gradient(90deg, rgba(5, 9, 22, 0.95) 0%, rgba(5, 9, 22, 0.85) 34%, rgba(5, 9, 22, 0.4) 58%, rgba(5, 9, 22, 0) 78%),
+      linear-gradient(180deg, rgba(5, 9, 22, 0) 60%, rgba(5, 9, 22, 0.6) 100%);
+  }
+
+  @media (max-width: 640px) {
+    .pv-scrim {
+      background: linear-gradient(180deg, rgba(244, 247, 251, 0.6) 0%, rgba(244, 247, 251, 0.9) 45%, rgba(244, 247, 251, 0.75) 100%);
+    }
+    .world-root[data-mode="night"] .pv-scrim {
+      background: linear-gradient(180deg, rgba(5, 9, 22, 0.6) 0%, rgba(5, 9, 22, 0.92) 45%, rgba(5, 9, 22, 0.8) 100%);
+    }
   }
 
   /* ---------- Night mode ---------- */
@@ -490,8 +511,7 @@ body {
   }
 
   .world-root[data-mode="night"] .pv-hero-ink {
-    color: #f2f7ff;
-    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+    color: #f5f8fc;
   }
 
   .world-root[data-mode="night"] .pv-contact {

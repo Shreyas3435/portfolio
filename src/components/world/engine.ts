@@ -1,6 +1,5 @@
 import {
   type BodyKind,
-  type Foliage,
   type Light,
   type PropKind,
   type SpriteBox,
@@ -9,36 +8,34 @@ import {
   CAR_WHEELS,
   DECOR_BOX,
   DECOR_LIGHTS,
-  FOLIAGE_BOX,
   GATE_LIGHTS,
-  LANTERNS,
-  PLACE_LIGHTS,
-  POLE_ARMS,
-  POLE_BOX,
+  LABEL_BOX,
   PROP_BOX,
   PROP_DEBRIS,
   PROP_LIGHTS,
-  SPIRIT_PODS,
   TRAIN_BOX,
   TRAIN_CAR_LEN,
-  blockLights,
   gateBox,
   paintBody,
   paintCampfire,
   paintCar,
-  paintFoliage,
   paintFountain,
   paintGate,
+  paintLabel,
   paintPlace,
-  paintPole,
   paintProp,
-  paintSignpost,
+  paintRooftop,
   paintTrainCar,
+  paintTree,
+  perimeterLights,
+  placeLights,
+  rooftopBox,
+  treeBox,
 } from "./art";
-import { drawDecorOverlay, drawPlaceOverlay, makeOverlaySprites, type OverlaySprites } from "./overlays";
+import { drawDecorOverlay, drawPlaceOverlay } from "./overlays";
 import { type Ctx, displayFont, mulberry32, rgba, setDisplayFamily, text } from "./paint";
-import { CONES, COURT, DECOR, EDGE, NAME, PONDS, SPAWN, TRACK_Y, WORLD_H, WORLD_W, districts, places, type Place } from "./places";
-import { TILE, buildWorld, queryColliders, renderTile, type WorldData } from "./scenery";
+import { CONES, COURT, DECOR, EDGE, NAME, PARKING, PONDS, SPAWN, TRACK_Y, WORLD_H, WORLD_W, districts, places, type Place } from "./places";
+import { TILE, buildWorld, contact, queryColliders, renderTile, type Standing, type WorldData } from "./scenery";
 
 export interface EngineCallbacks {
   onNear: (id: string | null) => void;
@@ -135,7 +132,6 @@ export class WorldEngine {
 
   private tiles = new Map<string, HTMLCanvasElement>();
   private sprites = new Map<string, HTMLCanvasElement>();
-  private overlay: OverlaySprites | null = null;
 
   car = { x: SPAWN.x, y: SPAWN.y, a: SPAWN.angle, vx: 0, vy: 0, steer: 0 };
   private cam = { x: SPAWN.x, y: SPAWN.y - 140 };
@@ -318,11 +314,10 @@ export class WorldEngine {
     this.canvas.width = Math.round(w * dpr);
     this.canvas.height = Math.round(h * dpr);
     const S = this.zoom * dpr;
-    if (Math.abs(S - this.S) > 0.01 || !this.overlay) {
+    if (Math.abs(S - this.S) > 0.01 || !this.sprites.size) {
       this.S = S;
       this.tiles.clear();
       this.sprites.clear();
-      this.overlay = makeOverlaySprites(S);
     }
     if (this.ready && !this.raf) this.render();
   }
@@ -374,9 +369,14 @@ export class WorldEngine {
     return c;
   }
 
-  private foliageSprite(kind: Foliage, variant: number) {
-    const v = kind === "block" ? variant : variant % 3;
-    return this.sprite(`f:${kind}:${v}`, FOLIAGE_BOX[kind], (g) => paintFoliage(g, kind, mulberry32(kind.length * 97 + v * 13), v));
+  private standingSprite(s: Standing): [HTMLCanvasElement, SpriteBox] {
+    if (s.kind === "roof") {
+      const box = rooftopBox(s.w, s.h, s.height);
+      return [this.sprite(`roof:${s.variant}:${s.w}:${s.h}:${s.height}`, box, (g) => paintRooftop(g, mulberry32(s.variant * 31 + s.w), s.variant, s.w, s.h, s.height)), box];
+    }
+    const v = s.variant % 3;
+    const box = treeBox(s.kind);
+    return [this.sprite(`tree:${s.kind}:${v}`, box, (g) => paintTree(g, s.kind as Exclude<Standing["kind"], "roof">, mulberry32(s.kind.length * 97 + v * 13), v)), box];
   }
 
   private propSprite(kind: PropKind, variant: number) {
@@ -398,8 +398,8 @@ export class WorldEngine {
 
   private spawnBodies() {
     const add = (kind: BodyKind, x: number, y: number, char = "") => {
-      const r = { crate: 16, cone: 9, ball: 15, brick: 11, letter: 26 }[kind];
-      const m = { crate: 1.3, cone: 0.35, ball: 0.5, brick: 0.7, letter: 1.4 }[kind];
+      const r = { crate: 16, cone: 9, ball: 15, brick: 11, letter: 26, sedan: 24 }[kind];
+      const m = { crate: 1.3, cone: 0.35, ball: 0.5, brick: 0.7, letter: 1.4, sedan: 3 }[kind];
       this.bodies.push({ kind, char, x, y, vx: 0, vy: 0, a: 0, va: 0, r, m, hx: x, hy: y, ha: 0, order: this.bodies.length, disturbed: -99, lift: 0, rb: null });
     };
     const chars = NAME.text.split("");
@@ -412,12 +412,17 @@ export class WorldEngine {
     for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) add("crate", 2080 + i * 34, 1940 + j * 34);
     for (const [x, y] of [[2560, 1440], [2594, 1452], [960, 1460], [1300, 700], [2140, 860]]) add("crate", x, y);
     add("ball", COURT.x, COURT.y);
+    PARKING.forEach((slot, i) => {
+      add("sedan", slot.x, slot.y, String.fromCharCode(i * 3 + 1));
+      const b = this.bodies[this.bodies.length - 1];
+      b.a = b.ha = slot.a;
+    });
     add("ball", 1890, 1460);
   }
 
   private spawnFireflies() {
     const st = this.world!.standing;
-    const anchors: [number, number][] = st.filter((s) => s.kind === "spirit").map((s) => [s.x, s.y - 60]);
+    const anchors: [number, number][] = st.filter((s) => s.kind === "broadleaf").slice(0, 10).map((s) => [s.x, s.y]);
     for (const p of PONDS) anchors.push([p.x, p.y - 20]);
     anchors.push([1010, 1000]);
     for (const [x, y] of anchors) for (let k = 0; k < 4; k++) this.fireflies.push({ x: x + (Math.random() - 0.5) * 160, y: y + (Math.random() - 0.5) * 100, phase: Math.random() * 6 });
@@ -556,9 +561,9 @@ export class WorldEngine {
     let best: Place | null = null;
     let bestD = Infinity;
     for (const p of places) {
-      const x0 = p.x - p.box.ax;
-      const y0 = p.y - p.box.ay;
-      if (x > x0 && x < x0 + p.box.w && y > y0 && y < p.y + 70) {
+      const hw = p.kind === "skills" ? 150 : p.w / 2 + 20;
+      const hh = p.kind === "skills" ? 150 : p.h / 2 + 40;
+      if (Math.abs(x - p.x) < hw && y > p.y - hh - 30 && y < p.y + hh) {
         const d = Math.abs(x - p.x) + Math.abs(y - p.y);
         if (d < bestD) {
           best = p;
@@ -610,7 +615,7 @@ export class WorldEngine {
     if (!this.alive) return;
     const rawDt = (now - this.last) / 1000;
     this.last = now;
-    const dt = Math.min(rawDt, 1 / 30);
+    const dt = Math.max(0, Math.min(rawDt, 1 / 30));
     this.t += dt;
 
     // If a couple of seconds run slow, step quality down; very slow jumps straight to the lightest mode.
@@ -700,7 +705,7 @@ export class WorldEngine {
       const st = this.world.standing;
       for (let i = 0; i < st.length; i++) {
         const s = st[i];
-        if (s.kind !== "hedge" || Math.abs(s.x - car.x) > 40 || Math.abs(s.y - 10 - car.y) > 34) continue;
+        if (s.kind !== "shrub" || Math.abs(s.x - car.x) > 24 || Math.abs(s.y - car.y) > 24) continue;
         this.kickTree(i, speed / 2000);
         if (Math.random() < 0.3) this.leaves(s.x, s.y, 1, false);
       }
@@ -771,14 +776,9 @@ export class WorldEngine {
     for (const i of queryColliders(this.world, car.x, car.y, this.scratch)) {
       const c = this.world.colliders[i];
       if (c.ref.type === "prop" && this.world.props[c.ref.i].brokenAt >= 0) continue;
-      const dx = car.x - c.x;
-      const dy = car.y - c.y;
-      const min = CAR_R + c.r;
-      const d2 = dx * dx + dy * dy;
-      if (d2 >= min * min) continue;
-      const d = Math.sqrt(d2) || 0.01;
-      const nx = dx / d;
-      const ny = dy / d;
+      const hit = contact(c, car.x, car.y, CAR_R);
+      if (!hit) continue;
+      const { nx, ny, depth } = hit;
       const vn = car.vx * nx + car.vy * ny;
       if (c.ref.type === "prop" && -vn > 110) {
         this.breakProp(c.ref.i, car.vx, car.vy);
@@ -786,8 +786,8 @@ export class WorldEngine {
         car.vy *= 0.82;
         continue;
       }
-      car.x += nx * (min - d);
-      car.y += ny * (min - d);
+      car.x += nx * depth;
+      car.y += ny * depth;
       if (vn < 0) {
         car.vx -= 1.35 * vn * nx;
         car.vy -= 1.35 * vn * ny;
@@ -795,7 +795,7 @@ export class WorldEngine {
         if (c.ref.type === "tree") {
           this.kickTree(c.ref.i, -vn / 260);
           const s = this.world.standing[c.ref.i];
-          if (-vn > 90) this.leaves(s.x, s.y - 60, this.quality ? 3 : 7, s.kind === "ginkgo");
+          if (-vn > 90) this.leaves(s.x, s.y, this.quality ? 3 : 7, false);
         } else if (c.ref.type === "place") {
           this.placeVel[c.ref.i] += -vn / 180;
         }
@@ -934,21 +934,16 @@ export class WorldEngine {
       for (const ci of queryColliders(this.world, a.x, a.y, this.scratch)) {
         const c = this.world.colliders[ci];
         if (c.ref.type === "prop" && this.world.props[c.ref.i].brokenAt >= 0) continue;
-        const dx = a.x - c.x;
-        const dy = a.y - c.y;
-        const min = a.r + c.r;
-        const d2 = dx * dx + dy * dy;
-        if (d2 >= min * min) continue;
-        const d = Math.sqrt(d2) || 0.01;
-        const nx = dx / d;
-        const ny = dy / d;
+        const hit = contact(c, a.x, a.y, a.r);
+        if (!hit) continue;
+        const { nx, ny, depth } = hit;
         const vn = a.vx * nx + a.vy * ny;
         if (c.ref.type === "prop" && -vn > 200) {
           this.breakProp(c.ref.i, a.vx, a.vy);
           continue;
         }
-        a.x += nx * (min - d);
-        a.y += ny * (min - d);
+        a.x += nx * depth;
+        a.y += ny * depth;
         if (vn < 0) {
           a.vx -= 1.5 * vn * nx;
           a.vy -= 1.5 * vn * ny;
@@ -1118,7 +1113,7 @@ export class WorldEngine {
     const ox = Math.round(-(left + shakeX) * S);
     const oy = Math.round(-(top + shakeY) * S);
 
-    ctx.fillStyle = "#5cb85c";
+    ctx.fillStyle = "#6b8d3d";
     for (let tx = Math.floor(left / TILE); tx <= Math.floor((left + vw) / TILE); tx++)
       for (let ty = Math.floor(top / TILE); ty <= Math.floor((top + vh) / TILE); ty++) {
         const tile = this.tiles.get(`${tx},${ty}`);
@@ -1134,173 +1129,123 @@ export class WorldEngine {
     this.drawTracks();
     if (!this.world) return;
 
-    // Gather everything that stands up, then paint back-to-front.
+    // Aerial view: ground-level things first, then the jeep, then anything
+    // tall enough to pass over it (trees, rooftops, gantries).
     const inView = (x0: number, y0: number, x1: number, y1: number) => x1 > left && x0 < left + vw && y1 > top && y0 < top + vh;
-    const list = this.drawList;
-    list.length = 0;
-    const st = this.world.standing;
-    for (let i = 0; i < st.length; i++) {
-      const s = st[i];
-      const b = FOLIAGE_BOX[s.kind];
-      if (inView(s.x - b.ax * s.s, s.y - b.ay * s.s, s.x + b.ax * s.s, s.y + 20)) list.push({ y: s.y, k: 0, i });
+    const world = this.world;
+    for (let i = 0; i < DECOR.length; i++) {
+      const dc = DECOR[i];
+      const box = DECOR_BOX[dc.kind];
+      if (!inView(dc.x - box.ax, dc.y - box.ay, dc.x - box.ax + box.w, dc.y - box.ay + box.h)) continue;
+      ctx.setTransform(S, 0, 0, S, ox + S * dc.x, oy + S * dc.y);
+      const spr = this.sprite(`d:${dc.kind}`, box, (g) => (dc.kind === "fountain" ? paintFountain(g) : paintCampfire(g, mulberry32(4))));
+      ctx.drawImage(spr, -box.ax, -box.ay, box.w, box.h);
     }
-    const props = this.world.props;
+    ctx.setTransform(S, 0, 0, S, ox, oy);
+    for (const dc of DECOR) if (inView(dc.x - 120, dc.y - 120, dc.x + 120, dc.y + 120)) drawDecorOverlay(ctx, dc.kind, dc.x, dc.y, t);
+
+    for (const b of this.bodies) {
+      if (!inView(b.x - 50, b.y - 50, b.x + 50, b.y + 50)) continue;
+      const size = BODY_SIZE[b.kind];
+      ctx.setTransform(S, 0, 0, S, ox, oy);
+      if (b.kind !== "letter") {
+        ctx.fillStyle = `rgba(14, 22, 30, ${0.3 * (1 - b.lift / 60)})`;
+        ctx.beginPath();
+        ctx.ellipse(b.x + 4 + b.lift * 0.4, b.y + 5 + b.lift * 0.5, b.r * (b.kind === "sedan" ? 1.4 : 1), b.r * (b.kind === "sedan" ? 0.9 : 1), b.a, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      const sc = 1 + b.lift / 120;
+      const cos = Math.cos(b.a) * S * sc;
+      const sin = Math.sin(b.a) * S * sc;
+      ctx.setTransform(cos, sin, -sin, cos, ox + S * b.x, oy + S * b.y);
+      ctx.drawImage(this.bodySprite(b), -size / 2, -size / 2, size, size);
+    }
+
+    const props = world.props;
     for (let i = 0; i < props.length; i++) {
       const p = props[i];
-      if (p.brokenAt < 0 && inView(p.x - 40, p.y - 100, p.x + 40, p.y + 20)) list.push({ y: p.y, k: 1, i });
+      const box = PROP_BOX[p.kind];
+      if (p.brokenAt >= 0 || !inView(p.x - box.ax, p.y - box.ay, p.x - box.ax + box.w, p.y - box.ay + box.h)) continue;
+      const g = p.regrowAt >= 0 ? easeOutBack(clamp((this.t - p.regrowAt) / 0.55, 0, 1)) : 1;
+      ctx.setTransform(S * g, 0, 0, S * g, ox + S * p.x, oy + S * p.y);
+      ctx.drawImage(this.propSprite(p.kind, p.variant), -box.ax, -box.ay, box.w, box.h);
     }
-    for (let i = 0; i < places.length; i++) {
-      const p = places[i];
-      if (inView(p.x - p.box.ax - 160, p.y - p.box.ay - 120, p.x - p.box.ax + p.box.w + 160, p.y - p.box.ay + p.box.h + 60)) list.push({ y: p.y, k: 2, i });
-    }
-    for (let i = 0; i < districts.length; i++) {
-      const g = districts[i].gate;
-      if (inView(g.x - 200, g.y - 260, g.x + 200, g.y + 40)) list.push({ y: g.y, k: 3, i });
-    }
-    for (let i = 0; i < DECOR.length; i++) {
-      const d = DECOR[i];
-      if (inView(d.x - 160, d.y - 220, d.x + 160, d.y + 60)) list.push({ y: d.y, k: 4, i });
-    }
-    for (let i = 0; i < this.bodies.length; i++) {
-      const b = this.bodies[i];
-      if (inView(b.x - 50, b.y - 90, b.x + 50, b.y + 50)) list.push({ y: b.y, k: 5, i });
-    }
-    for (let i = 0; i < this.world.poles.length; i++) {
-      const p = this.world.poles[i];
-      if (inView(p.x - 40, p.y - 150, p.x + 40, p.y + 10)) list.push({ y: p.y, k: 7, i });
-    }
+
+    this.drawCar(ox, oy);
+
     if (this.trainX !== null) {
       for (let c = 0; c < TRAIN_CARS; c++) {
         const cx = this.trainX + c * TRAIN_CAR_LEN + TRAIN_CAR_LEN / 2;
-        if (inView(cx - 110, TRACK_Y - 90, cx + 110, TRACK_Y + 20)) list.push({ y: TRACK_Y + 10, k: 8, i: c });
+        if (!inView(cx - 120, TRACK_Y - 40, cx + 120, TRACK_Y + 60)) continue;
+        const engine = c === TRAIN_CARS - 1;
+        ctx.setTransform(S, 0, 0, S, ox + S * cx, oy + S * TRACK_Y);
+        ctx.drawImage(this.sprite(`train:${engine ? 1 : 0}`, TRAIN_BOX, (g) => paintTrainCar(g, engine)), -TRAIN_BOX.ax, -TRAIN_BOX.ay, TRAIN_BOX.w, TRAIN_BOX.h);
       }
     }
-    list.push({ y: this.car.y + 6, k: 6, i: 0 });
-    list.sort((a, b) => a.y - b.y);
 
-    const sway = this.quality || this.reduced ? 0 : 1;
-    for (const d of list) {
-      switch (d.k) {
-        case 0: {
-          const s = st[d.i];
-          const box = FOLIAGE_BOX[s.kind];
-          const wob = this.treeWob[d.i];
-          const low = s.kind === "hedge" || s.kind === "rock" || s.kind === "block";
-          const skew = low ? wob * 0.4 : sway * Math.sin(this.t * 1.3 + s.x * 0.013) * 0.014 + wob * 0.35;
-          const sc = S * s.s;
-          ctx.setTransform(sc, 0, -sc * skew, sc * (low ? 1 - Math.abs(wob) * 0.25 : 1), ox + S * s.x, oy + S * s.y);
-          ctx.drawImage(this.foliageSprite(s.kind, s.variant), -box.ax, -box.ay, box.w, box.h);
-          break;
-        }
-        case 1: {
-          const p = props[d.i];
-          const box = PROP_BOX[p.kind];
-          const g = p.regrowAt >= 0 ? easeOutBack(clamp((this.t - p.regrowAt) / 0.55, 0, 1)) : 1;
-          ctx.setTransform(S * g, 0, 0, S * g, ox + S * p.x, oy + S * p.y);
-          ctx.drawImage(this.propSprite(p.kind, p.variant), -box.ax, -box.ay, box.w, box.h);
-          break;
-        }
-        case 2: {
-          const p = places[d.i];
-          const w = this.placeWob[d.i];
-          ctx.setTransform(S * (1 - w * 0.035), 0, -S * w * 0.02, S * (1 + w * 0.05), ox + S * p.x, oy + S * p.y);
-          ctx.drawImage(this.placeSprite(p), -p.box.ax, -p.box.ay, p.box.w, p.box.h);
-          ctx.setTransform(S, 0, 0, S, ox, oy);
-          if (this.overlay) drawPlaceOverlay(ctx, p, t, this.overlay, this.near === p.id);
-          break;
-        }
-        case 3: {
-          const dist = districts[d.i];
-          ctx.setTransform(S, 0, 0, S, ox + S * dist.gate.x, oy + S * dist.gate.y);
-          const gb = gateBox();
-          ctx.drawImage(this.sprite(`g:${dist.id}`, gb, (g) => paintGate(g, dist)), -gb.ax, -gb.ay, gb.w, gb.h);
-          break;
-        }
-        case 4: {
-          const dc = DECOR[d.i];
-          const box = DECOR_BOX[dc.kind];
-          ctx.setTransform(S, 0, 0, S, ox + S * dc.x, oy + S * dc.y);
-          const spr = this.sprite(`d:${dc.kind}`, box, (g) =>
-            dc.kind === "fountain" ? paintFountain(g) : dc.kind === "campfire" ? paintCampfire(g, mulberry32(4)) : paintSignpost(g, districts),
-          );
-          ctx.drawImage(spr, -box.ax, -box.ay, box.w, box.h);
-          ctx.setTransform(S, 0, 0, S, ox, oy);
-          drawDecorOverlay(ctx, dc.kind, dc.x, dc.y, t);
-          break;
-        }
-        case 5: {
-          const b = this.bodies[d.i];
-          const size = BODY_SIZE[b.kind];
-          ctx.setTransform(S, 0, 0, S, ox, oy);
-          const shadowR = b.kind === "letter" ? 28 : b.r;
-          ctx.fillStyle = `rgba(24, 48, 44, ${0.28 * (1 - b.lift / 60)})`;
-          ctx.beginPath();
-          ctx.ellipse(b.x + 5, b.y + b.r * 0.55, shadowR, shadowR * 0.4, 0, 0, Math.PI * 2);
-          ctx.fill();
-          const cos = Math.cos(b.a) * S;
-          const sin = Math.sin(b.a) * S;
-          ctx.setTransform(cos, sin, -sin, cos, ox + S * b.x, oy + S * (b.y - b.lift));
-          ctx.drawImage(this.bodySprite(b), -size / 2, -size / 2, size, size);
-          break;
-        }
-        case 6:
-          this.drawCar(ox, oy);
-          break;
-        case 7: {
-          const p = this.world.poles[d.i];
-          ctx.setTransform(S, 0, 0, S, ox + S * p.x, oy + S * p.y);
-          ctx.drawImage(this.sprite(`pole:${p.transformer ? 1 : 0}`, POLE_BOX, (g) => paintPole(g, p.transformer)), -POLE_BOX.ax, -POLE_BOX.ay, POLE_BOX.w, POLE_BOX.h);
-          break;
-        }
-        case 8: {
-          const cx = this.trainX! + d.i * TRAIN_CAR_LEN + TRAIN_CAR_LEN / 2;
-          const engine = d.i === TRAIN_CARS - 1;
-          ctx.setTransform(S, 0, 0, S, ox + S * cx, oy + S * (TRACK_Y + 10));
-          ctx.drawImage(this.sprite(`train:${engine ? 1 : 0}`, TRAIN_BOX, (g) => paintTrainCar(g, engine)), -TRAIN_BOX.ax, -TRAIN_BOX.ay, TRAIN_BOX.w, TRAIN_BOX.h);
-          break;
-        }
-      }
+    for (let i = 0; i < places.length; i++) {
+      const p = places[i];
+      if (!inView(p.x - p.box.ax - 40, p.y - p.box.ay - 40, p.x - p.box.ax + p.box.w + 40, p.y - p.box.ay + p.box.h + 40)) continue;
+      const w = this.placeWob[i];
+      ctx.setTransform(S * (1 + w * 0.02), 0, 0, S * (1 + w * 0.02), ox + S * p.x, oy + S * p.y);
+      ctx.drawImage(this.placeSprite(p), -p.box.ax, -p.box.ay, p.box.w, p.box.h);
+      ctx.setTransform(S, 0, 0, S, ox, oy);
+      drawPlaceOverlay(ctx, p, t, this.near === p.id);
+    }
+
+    const st = world.standing;
+    for (let i = 0; i < st.length; i++) {
+      const s = st[i];
+      const ext = s.kind === "roof" ? Math.max(s.w, s.h) + s.height : 120;
+      if (!inView(s.x - ext, s.y - ext, s.x + ext, s.y + ext)) continue;
+      const [spr, box] = this.standingSprite(s);
+      const wob = this.treeWob[i];
+      const sc = S * s.s * (1 + wob * 0.06);
+      const rot = s.kind === "roof" ? 0 : wob * 0.08 + (this.quality || this.reduced ? 0 : Math.sin(this.t * 1.1 + s.x * 0.01) * 0.012);
+      const cos = Math.cos(rot) * sc;
+      const sin = Math.sin(rot) * sc;
+      ctx.setTransform(cos, sin, -sin, cos, ox + S * s.x, oy + S * s.y);
+      ctx.drawImage(spr, -box.ax, -box.ay, box.w, box.h);
+    }
+
+    for (let i = 0; i < districts.length; i++) {
+      const dist = districts[i];
+      const g = dist.gate;
+      const gb = gateBox();
+      if (!inView(g.x - gb.ax, g.y - gb.ay, g.x - gb.ax + gb.w, g.y - gb.ay + gb.h)) continue;
+      ctx.setTransform(S, 0, 0, S, ox + S * g.x, oy + S * g.y);
+      ctx.drawImage(this.sprite(`g:${dist.id}`, gb, (gg) => paintGate(gg, dist)), -gb.ax, -gb.ay, gb.w, gb.h);
     }
 
     ctx.setTransform(S, 0, 0, S, ox, oy);
-    this.drawWires(left, top, vw, vh);
     if (this.nightK < 0.5) this.drawFlocks(left, top, vw, vh);
     this.drawParticles();
     if (!this.quality && !this.reduced && this.nightK < 0.99) this.drawCloudShadows(left, top, vw, vh);
     if (this.nightK > 0.01) this.drawNight(ox, oy, left, top, vw, vh);
+    this.drawLabels(ox, oy, left, top, vw, vh);
   }
 
-  private drawWires(left: number, top: number, vw: number, vh: number) {
-    if (!this.world) return;
+  /** Floating map labels, drawn after the night pass so they stay readable. */
+  private drawLabels(ox: number, oy: number, left: number, top: number, vw: number, vh: number) {
     const ctx = this.ctx;
-    const poles = this.world.poles;
-    ctx.strokeStyle = "rgba(30, 36, 44, 0.75)";
-    ctx.lineWidth = 1.3;
-    for (let i = 1; i < poles.length; i++) {
-      const a = poles[i - 1];
-      const b = poles[i];
-      if (a.road !== b.road) continue;
-      if (Math.max(a.x, b.x) < left - 20 || Math.min(a.x, b.x) > left + vw + 20 || Math.max(a.y, b.y) < top || Math.min(a.y, b.y) - 140 > top + vh) continue;
-      for (const [dx, dy] of POLE_ARMS) {
-        const x0 = a.x + dx;
-        const y0 = a.y + dy - 3;
-        const x1 = b.x + dx;
-        const y1 = b.y + dy - 3;
-        ctx.beginPath();
-        ctx.moveTo(x0, y0);
-        ctx.quadraticCurveTo((x0 + x1) / 2, (y0 + y1) / 2 + 26, x1, y1);
-        ctx.stroke();
-      }
+    const S = this.S;
+    for (const p of places) {
+      const ly = p.y - (p.kind === "skills" ? 150 : p.h / 2) - 26;
+      if (p.x < left - 160 || p.x > left + vw + 160 || ly < top - 30 || ly > top + vh + 30) continue;
+      const near = this.near === p.id;
+      const sc = near ? 1.12 : 1;
+      ctx.setTransform(S * sc, 0, 0, S * sc, ox + S * p.x, oy + S * (ly - (near ? 4 + Math.sin(this.t * 4) * 2 : 0)));
+      ctx.drawImage(this.sprite(`label:${p.id}`, LABEL_BOX, (g) => paintLabel(g, p)), -LABEL_BOX.ax, -LABEL_BOX.ay, LABEL_BOX.w, LABEL_BOX.h);
     }
+    ctx.setTransform(S, 0, 0, S, ox, oy);
   }
 
-  /** Night: darken everything, then add the city's lights on top. */
   private drawNight(ox: number, oy: number, left: number, top: number, vw: number, vh: number) {
     const ctx = this.ctx;
     const S = this.S;
     const k = this.nightK;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = `rgba(8, 14, 44, ${0.66 * k})`;
+    ctx.fillStyle = `rgba(6, 10, 26, ${0.72 * k})`;
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.setTransform(S, 0, 0, S, ox, oy);
     ctx.globalCompositeOperation = "lighter";
@@ -1325,20 +1270,25 @@ export class WorldEngine {
     if (this.world) {
       // Props can break, so their light is drawn live.
       for (const p of this.world.props) {
-        if (p.brokenAt >= 0 || (p.kind !== "lamp" && p.kind !== "vending")) continue;
+        if (p.brokenAt >= 0 || p.kind !== "lamp") continue;
         apply(p.x, p.y, PROP_LIGHTS[p.kind], a);
-        if (p.kind === "lamp") lamp(p.x + 24, p.y + 4, 70, "#ffd9a0", a * 0.6);
+        if (p.kind === "lamp") lamp(p.x + 24, p.y, 95, "#ffe2b0", a * 0.75);
       }
     }
-    // The name blocks glow neon.
-    for (const b of this.bodies) if (b.kind === "letter") lamp(b.x, b.y - b.lift, 46, "#3df0ff", a * 0.6);
+    // Red aviation beacons on the tall towers.
+    if (Math.sin(this.t * 3) > 0.5) {
+      for (const id of ["shadowpath", "linkedin"]) {
+        const p = places.find((pl) => pl.id === id)!;
+        for (const [dx, dy] of id === "linkedin" ? [[-72, -72], [72, 72]] : [[38, -30]]) lamp(p.x + dx, p.y + dy, 26, "#ff3b30", 0.9 * k);
+      }
+    }
     if (this.trainX !== null) for (let c = 0; c < TRAIN_CARS; c++) lamp(this.trainX + c * TRAIN_CAR_LEN + TRAIN_CAR_LEN / 2, TRACK_Y - 30, 110, "#ffe9b0", a * 0.8);
     if (!this.reduced) {
       for (const f of this.fireflies) {
         const fx = f.x + Math.sin(this.t * 0.7 + f.phase) * 30;
         const fy = f.y + Math.cos(this.t * 0.9 + f.phase * 1.3) * 18;
         const tw = 0.5 + 0.5 * Math.sin(this.t * 3 + f.phase * 2);
-        lamp(fx, fy, 10, "#d8ff7a", a * tw * 1.4);
+        lamp(fx, fy, 9, "#e0ff8a", a * tw * 1.3);
       }
     }
     // Headlights sweep ahead of the jeep; tail light behind.
@@ -1381,14 +1331,12 @@ export class WorldEngine {
     const apply = (x: number, y: number, lights: Light[], alpha: number) => {
       for (const [dx, dy, r, color] of lights) stamp(x + dx, y + dy, r, color, alpha);
     };
-    for (const p of places) apply(p.x, p.y, PLACE_LIGHTS[p.id] ?? [], a);
-    for (const p of places) if (p.kind === "skills") for (const [lx, ly] of LANTERNS) stamp(p.x + lx, p.y + ly, 42, "#3df0ff", a);
+    for (const p of places) apply(p.x, p.y, placeLights(p), a * 0.7);
     for (const d of districts) apply(d.gate.x, d.gate.y, GATE_LIGHTS(d), a);
     for (const d of DECOR) apply(d.x, d.y, DECOR_LIGHTS[d.kind], a);
-    for (const s of this.world.standing) {
-      if (s.kind === "block") apply(s.x, s.y, blockLights(s.variant), a * 0.9);
-      else if (s.kind === "spirit") for (const [dx, dy] of SPIRIT_PODS) stamp(s.x + dx * s.s, s.y + dy * s.s, 22, "#3df0ff", a);
-    }
+    for (const s of this.world.standing) if (s.kind === "roof") apply(s.x, s.y, perimeterLights(s.w, s.h), a * 0.55);
+    // Uplights on the name letters.
+    for (const b of this.bodies) if (b.kind === "letter") stamp(b.hx, b.hy + 30, 40, "#fff1d0", a * 0.7);
     this.lightmap = c;
     return c;
   }

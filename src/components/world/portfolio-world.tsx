@@ -262,7 +262,7 @@ export function PortfolioWorld() {
         aria-hidden={ready}
       >
         <div className="world-loader" aria-hidden />
-        <p className="font-display text-2xl font-bold">Loading the city…</p>
+        <p className="font-display text-2xl font-bold text-white/90">Loading the city…</p>
       </div>
     </div>
   );

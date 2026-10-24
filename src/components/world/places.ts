@@ -6,11 +6,13 @@ export const EDGE = 70;
 export const PLAZA = { x: 1700, y: 1320, r: 160 };
 export const SPAWN = { x: 1700, y: 1395, angle: -Math.PI / 2 };
 
-/** The big knock-over-able name north of the plaza. */
+/** Giant concrete letters north of the plaza; drive through them. */
 export const NAME = { text: "SHREYAS ALVA", x: 1700, y: 1060, advance: 66 };
-export const TAGLINE = { text: "FULL-STACK × AI ENGINEER  //  OPEN TO WORK & COLLABORATION", x: 1700, y: 1160 };
+export const TAGLINE = { text: "FULL-STACK × AI ENGINEER  ·  OPEN TO WORK & COLLABORATION", x: 1700, y: 1150 };
 /** The railway along the south edge; a train runs along it every so often. */
 export const TRACK_Y = WORLD_H - 150;
+/** Sun direction for cast shadows (towards the lower right). */
+export const SUN = { x: 0.62, y: 0.78 };
 
 export type PlaceKind = "project" | "workshop" | "about" | "skills" | "social";
 
@@ -20,20 +22,22 @@ export interface Place {
   district: DistrictId;
   title: string;
   subtitle: string;
-  /** Main paint colour. */
+  /** Accent colour (labels, UI). */
   color: string;
-  /** Darker, legible version for text. */
+  /** Darker, legible version for text on light backgrounds. */
   ink: string;
-  /** Ground anchor: base centre of the building. */
+  /** Footprint centre. */
   x: number;
   y: number;
-  /** Parking spot; also where fast travel drops you. */
+  /** Footprint size and building height (height drives the cast shadow). */
+  w: number;
+  h: number;
+  height: number;
+  /** Parking spot in front of the entrance; also the fast-travel drop. */
   front: [number, number];
   triggerRadius: number;
-  /** Sprite box relative to the anchor. */
+  /** Sprite box relative to the footprint centre (includes the shadow). */
   box: { w: number; h: number; ax: number; ay: number };
-  /** Static colliders relative to the anchor: [dx, dy, r]. */
-  colliders: [number, number, number][];
   projectSlug?: string;
   href?: string;
   hrefLabel?: string;
@@ -55,7 +59,7 @@ export const districts: District[] = [
     id: "projects",
     name: "Projects",
     blurb: "Flagship builds around the fountain plaza",
-    color: "#ff6d00",
+    color: "#ff7a1a",
     gate: { x: 1700, y: 870 },
     court: { x: 1700, y: 560, rx: 690, ry: 265, surface: "stone" },
   },
@@ -63,15 +67,15 @@ export const districts: District[] = [
     id: "connections",
     name: "Connections",
     blurb: "GitHub, LinkedIn, the post office and the print shop",
-    color: "#2979ff",
+    color: "#3b82f6",
     gate: { x: 2810, y: 1560 },
     court: { x: 2810, y: 1300, rx: 470, ry: 215, surface: "stone" },
   },
   {
     id: "home",
     name: "Home",
-    blurb: "About me and the spirit tree of skills",
-    color: "#00bfa5",
+    blurb: "About me and the old tree of skills",
+    color: "#14b8a6",
     gate: { x: 780, y: 1560 },
     court: { x: 780, y: 1290, rx: 430, ry: 225, surface: "meadow" },
   },
@@ -79,7 +83,7 @@ export const districts: District[] = [
     id: "playground",
     name: "The Court",
     blurb: "Street court: smash the cones, sink the ball",
-    color: "#ffab00",
+    color: "#f59e0b",
     gate: { x: 1700, y: 1790 },
     court: { x: 1700, y: 2070, rx: 560, ry: 255, surface: "court" },
   },
@@ -87,13 +91,19 @@ export const districts: District[] = [
 
 export const districtById = (id: DistrictId) => districts.find((d) => d.id === id)!;
 
-const place = (p: Omit<Place, "front" | "triggerRadius"> & { frontOffset?: number; triggerRadius?: number }): Place => ({
-  ...p,
-  front: [p.x, p.y + (p.frontOffset ?? 85)],
-  triggerRadius: p.triggerRadius ?? 150,
-});
+const PAD = 30;
 
-const projectBox = (w: number, h: number, ay: number) => ({ w, h, ax: w / 2, ay });
+const place = (
+  p: Omit<Place, "front" | "triggerRadius" | "box"> & { frontGap?: number; triggerRadius?: number },
+): Place => {
+  const shadow = p.height * 0.7;
+  return {
+    ...p,
+    front: [p.x, p.y + p.h / 2 + (p.frontGap ?? 55)],
+    triggerRadius: p.triggerRadius ?? 140,
+    box: { w: p.w + PAD * 2 + shadow * SUN.x, h: p.h + PAD * 2 + shadow * SUN.y, ax: p.w / 2 + PAD, ay: p.h / 2 + PAD },
+  };
+};
 
 export const places: Place[] = [
   // --- Projects district -----------------------------------------------------
@@ -103,12 +113,13 @@ export const places: Place[] = [
     district: "projects",
     title: "ShadowPath",
     subtitle: "Automated repository attack-surface analysis",
-    color: "#ff3b30",
-    ink: "#c4161c",
+    color: "#ef4444",
+    ink: "#b91c1c",
     x: 1080,
-    y: 560,
-    box: projectBox(320, 500, 420),
-    colliders: [[0, -22, 46]],
+    y: 470,
+    w: 130,
+    h: 130,
+    height: 260,
     projectSlug: "shadowpath",
   }),
   place({
@@ -117,12 +128,13 @@ export const places: Place[] = [
     district: "projects",
     title: "Product Search",
     subtitle: "Constraint-aware search for industrial parts",
-    color: "#ffab00",
-    ink: "#a86400",
+    color: "#f59e0b",
+    ink: "#a16207",
     x: 1390,
-    y: 390,
-    box: projectBox(400, 420, 340),
-    colliders: [[-95, -30, 50], [0, -30, 50], [95, -30, 50]],
+    y: 300,
+    w: 320,
+    h: 170,
+    height: 70,
     projectSlug: "industrial-product-search",
   }),
   place({
@@ -131,12 +143,13 @@ export const places: Place[] = [
     district: "projects",
     title: "The Workshop",
     subtitle: "Side builds, spikes and a security lab",
-    color: "#546e7a",
-    ink: "#2e3d45",
+    color: "#64748b",
+    ink: "#334155",
     x: 1700,
-    y: 270,
-    box: projectBox(340, 360, 290),
-    colliders: [[-62, -28, 48], [62, -28, 48]],
+    y: 200,
+    w: 230,
+    h: 140,
+    height: 55,
   }),
   place({
     id: "website-content-search",
@@ -144,12 +157,13 @@ export const places: Place[] = [
     district: "projects",
     title: "Content Search",
     subtitle: "Semantic search over any website",
-    color: "#2979ff",
-    ink: "#1446b8",
+    color: "#3b82f6",
+    ink: "#1d4ed8",
     x: 2010,
-    y: 390,
-    box: projectBox(400, 440, 360),
-    colliders: [[-95, -30, 52], [0, -30, 52], [95, -30, 52]],
+    y: 300,
+    w: 300,
+    h: 190,
+    height: 95,
     projectSlug: "website-content-search",
   }),
   place({
@@ -158,12 +172,13 @@ export const places: Place[] = [
     district: "projects",
     title: "Trek Saathi",
     subtitle: "Discovery & booking for Indian treks",
-    color: "#00c853",
-    ink: "#007a33",
+    color: "#22c55e",
+    ink: "#15803d",
     x: 2320,
-    y: 560,
-    box: projectBox(600, 460, 380),
-    colliders: [[-75, -30, 56], [75, -30, 56]],
+    y: 470,
+    w: 250,
+    h: 170,
+    height: 60,
     projectSlug: "trek-saathi",
   }),
 
@@ -174,36 +189,39 @@ export const places: Place[] = [
     district: "home",
     title: "About me",
     subtitle: "Who I am and how I work",
-    color: "#ff6d00",
-    ink: "#b34700",
+    color: "#f97316",
+    ink: "#c2410c",
     x: 560,
-    y: 1150,
-    box: projectBox(360, 380, 300),
-    colliders: [[-62, -30, 52], [62, -30, 52]],
+    y: 1080,
+    w: 200,
+    h: 150,
+    height: 70,
   }),
   place({
     id: "skills",
     kind: "skills",
     district: "home",
     title: "Skill Tree",
-    subtitle: "The spirit tree: what I'm strong at, and what's growing",
-    color: "#00bfa5",
-    ink: "#00796b",
+    subtitle: "The old tree: what I'm strong at, and what's growing",
+    color: "#14b8a6",
+    ink: "#0f766e",
     x: 1010,
-    y: 1140,
-    box: projectBox(380, 470, 400),
-    colliders: [[0, -16, 34]],
+    y: 1070,
+    w: 300,
+    h: 300,
+    height: 160,
+    frontGap: 20,
   }),
 
   // --- Connections district --------------------------------------------------
   ...(
     [
-      ["github", "GitHub", `Code Mart · @${profile.githubHandle}`, "#00c853", "#007a33", profile.github, "Open GitHub"],
-      ["linkedin", "LinkedIn", "The office tower · let's connect", "#0a66c2", "#084a8c", profile.linkedin, "Open LinkedIn"],
-      ["email", "Email", `Post office · ${profile.email}`, "#e53935", "#a31515", `mailto:${profile.email}`, "Write an email"],
-      ["resume", "Résumé", "Print shop · one-page PDF", "#ffc400", "#8a6400", profile.resumeUrl, "Download résumé"],
+      ["github", "GitHub", `Code & experiments · @${profile.githubHandle}`, "#22c55e", "#15803d", profile.github, "Open GitHub", 60],
+      ["linkedin", "LinkedIn", "The office tower · let's connect", "#0a66c2", "#084a8c", profile.linkedin, "Open LinkedIn", 240],
+      ["email", "Email", `Post office · ${profile.email}`, "#ef4444", "#b91c1c", `mailto:${profile.email}`, "Write an email", 55],
+      ["resume", "Résumé", "Print shop · one-page PDF", "#eab308", "#854d0e", profile.resumeUrl, "Download résumé", 45],
     ] as const
-  ).map(([id, title, subtitle, color, ink, href, hrefLabel], i) =>
+  ).map(([id, title, subtitle, color, ink, href, hrefLabel, height], i) =>
     place({
       id,
       kind: "social",
@@ -213,12 +231,13 @@ export const places: Place[] = [
       color,
       ink,
       x: 2440 + i * 247,
-      y: i === 0 || i === 3 ? 1170 : 1090,
-      box: projectBox(270, 320, 250),
-      colliders: [[-40, -26, 46], [40, -26, 46]],
+      y: i === 0 || i === 3 ? 1100 : 1030,
+      w: id === "linkedin" ? 160 : 180,
+      h: id === "linkedin" ? 160 : 130,
+      height,
       href,
       hrefLabel,
-      triggerRadius: 120,
+      triggerRadius: 115,
     }),
   ),
 ];
@@ -239,13 +258,19 @@ export const PONDS = [
   { x: 900, y: 2190, rx: 150, ry: 80 },
 ];
 
-export type DecorKind = "fountain" | "campfire" | "signpost";
+export type DecorKind = "fountain" | "campfire";
 export const DECOR: { kind: DecorKind; x: number; y: number; r: number }[] = [
-  { kind: "fountain", x: 1700, y: 610, r: 62 },
-  { kind: "campfire", x: 790, y: 1290, r: 28 },
-  { kind: "signpost", x: 1500, y: 1470, r: 10 },
+  { kind: "fountain", x: 1700, y: 600, r: 84 },
+  { kind: "campfire", x: 790, y: 1300, r: 28 },
 ];
 
 /** Street basketball court: hoops at both ends, a cone pyramid to the side. */
 export const COURT = { x: 1700, y: 2060, half: 230 };
 export const CONES = { x: 1700, y: 1950 };
+
+/** Parking bays with cars you can shove (they roll back to their bay). */
+export const PARKING: { x: number; y: number; a: number }[] = [
+  ...[0, 1, 2, 3, 4].map((i) => ({ x: 2560 + i * 60, y: 1380, a: -Math.PI / 2 })),
+  ...[0, 1, 2].map((i) => ({ x: 1200 + i * 60, y: 700, a: -Math.PI / 2 })),
+  ...[0, 1, 2].map((i) => ({ x: 2080 + i * 60, y: 700, a: Math.PI / 2 })),
+];

@@ -20,27 +20,27 @@ export function mulberry32(seed: number): Rand {
 export const range = (r: Rand, min: number, max: number) => min + (max - min) * r();
 export const pick = <T,>(r: Rand, list: readonly T[]) => list[Math.floor(r() * list.length)];
 
-// Clean, saturated anime-city palette.
+// Natural, slightly desaturated palette for a realistic aerial look.
 export const C = {
-  grass: "#5cb85c",
-  grassLight: "#9be27a",
-  grassDark: "#3c8f4a",
-  grassDeep: "#2a6a45",
-  asphalt: "#4a525c",
-  asphaltDark: "#383e46",
-  sidewalk: "#d9dde3",
-  curb: "#aeb5bf",
-  stone: "#e3e6ea",
-  stoneDark: "#b4bcc6",
-  water: "#29a8e0",
-  waterDeep: "#1373b8",
-  waterLight: "#8fe0ff",
+  grass: "#6b8d3d",
+  grassLight: "#88a94e",
+  grassDark: "#4f7130",
+  grassDeep: "#3a5826",
+  asphalt: "#3a3e43",
+  asphaltDark: "#2b2e32",
+  sidewalk: "#c8c4bb",
+  curb: "#a29e95",
+  stone: "#cdc8bc",
+  stoneDark: "#a59f92",
+  water: "#2e6c8a",
+  waterDeep: "#1b4a63",
+  waterLight: "#6aaac4",
   ink: "#1d232b",
   cream: "#fdfbf6",
-  wood: "#a0693e",
-  woodDark: "#6b4426",
-  warmLight: "#ffd27a",
-  neonCyan: "#3df0ff",
+  wood: "#8a5a36",
+  woodDark: "#5c3a22",
+  warmLight: "#ffd08a",
+  neonCyan: "#7ad7ff",
   neonAmber: "#ffb84d",
 } as const;
 
@@ -98,14 +98,11 @@ export function polyPath(ctx: Ctx, pts: Pt[]) {
   ctx.closePath();
 }
 
-/** Fill the current path with hard cel-shaded light / base / shadow bands. */
+/** Fill the current path with a smooth light-to-dark gradient. */
 export function shade(ctx: Ctx, x0: number, y0: number, x1: number, y1: number, light: string, base: string, dark: string) {
   const g = ctx.createLinearGradient(x0, y0, x1, y1);
   g.addColorStop(0, light);
-  g.addColorStop(0.28, light);
-  g.addColorStop(0.3, base);
-  g.addColorStop(0.7, base);
-  g.addColorStop(0.72, dark);
+  g.addColorStop(0.5, base);
   g.addColorStop(1, dark);
   ctx.fillStyle = g;
   ctx.fill();
@@ -220,4 +217,109 @@ export function outline(ctx: Ctx, base: string, width = 1.4) {
   ctx.strokeStyle = darken(base, 0.55);
   ctx.lineWidth = width;
   ctx.stroke();
+}
+
+// ---------------------------------------------------------------------------
+// Realism helpers: procedural noise textures and soft cast shadows.
+// ---------------------------------------------------------------------------
+
+let grainCanvas: HTMLCanvasElement | null = null;
+let cloudCanvas: HTMLCanvasElement | null = null;
+
+/** Tileable value noise, `octaves` layers, as a grey canvas centred on mid-grey. */
+function makeNoise(size: number, cell: number, octaves: number, seed: number) {
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const g = c.getContext("2d")!;
+  const img = g.createImageData(size, size);
+  const r = mulberry32(seed);
+  const layers: { n: number; grid: Float32Array; amp: number }[] = [];
+  let amp = 1;
+  let total = 0;
+  for (let o = 0; o < octaves; o++) {
+    const n = Math.max(2, Math.round(size / (cell / 2 ** o)));
+    const grid = new Float32Array(n * n);
+    for (let i = 0; i < grid.length; i++) grid[i] = r();
+    layers.push({ n, grid, amp });
+    total += amp;
+    amp *= 0.5;
+  }
+  const smooth = (t: number) => t * t * (3 - 2 * t);
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      let v = 0;
+      for (const { n, grid, amp: a } of layers) {
+        const fx = (x / size) * n;
+        const fy = (y / size) * n;
+        const x0 = Math.floor(fx) % n;
+        const y0 = Math.floor(fy) % n;
+        const x1 = (x0 + 1) % n;
+        const y1 = (y0 + 1) % n;
+        const tx = smooth(fx - Math.floor(fx));
+        const ty = smooth(fy - Math.floor(fy));
+        const top = grid[y0 * n + x0] * (1 - tx) + grid[y0 * n + x1] * tx;
+        const bot = grid[y1 * n + x0] * (1 - tx) + grid[y1 * n + x1] * tx;
+        v += (top * (1 - ty) + bot * ty) * a;
+      }
+      const k = Math.round((v / total) * 255);
+      const i = (y * size + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = k;
+      img.data[i + 3] = 255;
+    }
+  g.putImageData(img, 0, 0);
+  return c;
+}
+
+/** Fine per-pixel grain (asphalt, concrete, roofs). */
+export function grain() {
+  if (!grainCanvas) grainCanvas = makeNoise(128, 2, 2, 11);
+  return grainCanvas;
+}
+
+/** Soft cloudy variation (grass, water, large surfaces). */
+export function clouds() {
+  if (!cloudCanvas) cloudCanvas = makeNoise(256, 96, 4, 23);
+  return cloudCanvas;
+}
+
+/** Blend a noise texture into the current path. */
+export function texture(ctx: Ctx, noise: HTMLCanvasElement, alpha: number, op: GlobalCompositeOperation = "overlay") {
+  ctx.save();
+  ctx.clip();
+  ctx.globalAlpha = alpha;
+  ctx.globalCompositeOperation = op;
+  ctx.fillStyle = ctx.createPattern(noise, "repeat")!;
+  ctx.fill();
+  ctx.restore();
+}
+
+const SHADOW_SUN = { x: 0.62, y: 0.78 };
+
+/** Soft cast shadow of a rectangle extruded along the sun direction. */
+export function rectShadow(ctx: Ctx, x0: number, y0: number, w: number, h: number, height: number, alpha = 0.32) {
+  for (const [k, a] of [[1.08, 0.35], [1, 0.5], [0.9, 0.6]] as const) {
+    const len = height * 0.7 * k;
+    const dx = SHADOW_SUN.x * len;
+    const dy = SHADOW_SUN.y * len;
+    polyPath(ctx, [[x0, y0], [x0 + w, y0], [x0 + w + dx, y0 + dy], [x0 + w + dx, y0 + h + dy], [x0 + dx, y0 + h + dy], [x0, y0 + h]]);
+    ctx.fillStyle = `rgba(14, 22, 30, ${alpha * a})`;
+    ctx.fill();
+  }
+}
+
+/** Soft cast shadow of a circle (towers, tree canopies). */
+export function circleShadow(ctx: Ctx, x: number, y: number, rad: number, height: number, alpha = 0.32) {
+  for (const [k, a, grow] of [[1.08, 0.35, 1.12], [1, 0.5, 1.04], [0.9, 0.6, 0.98]] as const) {
+    const len = height * 0.7 * k;
+    const dx = SHADOW_SUN.x * len;
+    const dy = SHADOW_SUN.y * len;
+    const rr = rad * grow;
+    const ang = Math.atan2(dy, dx);
+    ctx.beginPath();
+    ctx.arc(x, y, rr, ang + Math.PI / 2, ang - Math.PI / 2);
+    ctx.arc(x + dx, y + dy, rr, ang - Math.PI / 2, ang + Math.PI / 2);
+    ctx.closePath();
+    ctx.fillStyle = `rgba(14, 22, 30, ${alpha * a})`;
+    ctx.fill();
+  }
 }

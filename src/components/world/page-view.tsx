@@ -54,13 +54,14 @@ function Hero({ night, onExplore }: { night: boolean; onExplore: () => void }) {
   return (
     <header className="pv-hero relative overflow-hidden">
       <CitySkyline night={night} />
+      <div className="pv-scrim pointer-events-none absolute inset-0" aria-hidden />
       <div className="relative mx-auto flex min-h-[520px] max-w-5xl flex-col justify-center px-5 pt-24 pb-28 sm:px-10">
         <p className="pv-pill w-fit">
           <span className="pv-dot" /> Open to work & collaborations
         </p>
         <h1 className="pv-hero-ink font-display mt-5 text-6xl leading-[0.95] font-bold sm:text-8xl">{profile.name}</h1>
         <p className="pv-hero-ink font-display mt-3 text-xl font-semibold sm:text-2xl">{profile.role}</p>
-        <p className="pv-hero-ink mt-5 max-w-xl text-[15px] leading-relaxed font-medium sm:text-base">{profile.heroLine}</p>
+        <p className="pv-hero-ink mt-5 max-w-xl text-base leading-relaxed font-medium sm:text-lg">{profile.heroLine}</p>
         <div className="mt-7 flex flex-wrap gap-2">
           <a href={`mailto:${profile.email}`} className="wv-btn wv-btn-solid" style={{ background: "#ff6d00" }}>
             <Mail size={16} /> Get in touch
@@ -322,13 +323,13 @@ function Contact({ onExplore }: { onExplore: () => void }) {
   );
 }
 
-/** Anime city skyline for the page hero, in day or night colours. */
+/** City skyline for the page hero, in day or night colours. */
 function CitySkyline({ night }: { night: boolean }) {
-  const sky = night ? ["#070d26", "#1b2456", "#4a3b7c"] : ["#4fb8ff", "#a9e2ff", "#fff1d6"];
-  const far = night ? "#1a2350" : "#8fbfe3";
-  const near = night ? "#0f1636" : "#5f8fbf";
-  const ground = night ? "#0c2a2a" : "#3c8f4a";
-  const windowOn = night ? "#ffd27a" : "#d9f2ff";
+  const sky = night ? ["#050916", "#121a3a", "#2a2450"] : ["#6fb3e0", "#b9dcf0", "#f3e6d3"];
+  const far = night ? "#141b38" : "#9db6c9";
+  const near = night ? ["#0d1328", "#080c1c"] : ["#6d8597", "#4b6274"];
+  const ground = night ? "#070b16" : "#3f5a3a";
+  const lit = night ? "#ffcf7a" : "#e6f2fa";
   const far1 = [[0, 300, 90], [80, 260, 70], [150, 320, 60], [210, 240, 80], [300, 290, 60], [360, 210, 70], [440, 280, 90], [540, 250, 60], [610, 300, 80], [700, 230, 70], [780, 290, 90], [880, 260, 60], [950, 310, 80], [1040, 240, 70], [1120, 290, 60], [1190, 220, 80], [1280, 280, 70], [1360, 250, 80]];
   const near1 = [[20, 380, 110], [140, 340, 90], [250, 400, 100], [370, 330, 80], [460, 390, 120], [600, 350, 90], [710, 410, 100], [830, 360, 80], [930, 390, 110], [1060, 340, 90], [1170, 400, 100], [1290, 350, 120]];
   return (
@@ -336,47 +337,51 @@ function CitySkyline({ night }: { night: boolean }) {
       <defs>
         <linearGradient id="pv-sky" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor={sky[0]} />
-          <stop offset="0.55" stopColor={sky[1]} />
+          <stop offset="0.6" stopColor={sky[1]} />
           <stop offset="1" stopColor={sky[2]} />
         </linearGradient>
+        <linearGradient id="pv-near" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={near[0]} />
+          <stop offset="1" stopColor={near[1]} />
+        </linearGradient>
+        <linearGradient id="pv-haze" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0.45" stopColor={sky[2]} stopOpacity="0" />
+          <stop offset="1" stopColor={sky[2]} stopOpacity={night ? 0.35 : 0.55} />
+        </linearGradient>
         <radialGradient id="pv-orb" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stopColor={night ? "#fffbe8" : "#fff7cc"} />
-          <stop offset="0.35" stopColor={night ? "#fffbe8" : "#ffe28a"} stopOpacity="0.6" />
-          <stop offset="1" stopColor={night ? "#fffbe8" : "#ffe28a"} stopOpacity="0" />
+          <stop offset="0" stopColor={night ? "#fffbe8" : "#fff7d6"} />
+          <stop offset="0.35" stopColor={night ? "#fffbe8" : "#ffe9a8"} stopOpacity="0.5" />
+          <stop offset="1" stopColor={night ? "#fffbe8" : "#ffe9a8"} stopOpacity="0" />
         </radialGradient>
       </defs>
       <rect width="1440" height="560" fill="url(#pv-sky)" />
       {night &&
-        Array.from({ length: 60 }, (_, i) => (
-          <circle key={i} cx={(i * 197) % 1440} cy={(i * 89) % 260} r={i % 5 === 0 ? 1.8 : 1} fill="#ffffff" opacity={0.4 + (i % 4) * 0.15} />
+        Array.from({ length: 70 }, (_, i) => (
+          <circle key={i} cx={(i * 197) % 1440} cy={(i * 89) % 280} r={i % 7 === 0 ? 1.5 : 0.9} fill="#ffffff" opacity={0.35 + (i % 4) * 0.12} />
         ))}
-      <circle cx="1080" cy="150" r="140" fill="url(#pv-orb)" />
-      <circle cx="1080" cy="150" r={night ? 34 : 44} fill={night ? "#fffbe8" : "#fff7cc"} />
-      {!night && (
-        <g fill="#ffffff" opacity="0.9">
-          <ellipse cx="260" cy="120" rx="110" ry="24" />
-          <ellipse cx="330" cy="104" rx="70" ry="28" />
-          <ellipse cx="760" cy="80" rx="90" ry="18" />
-        </g>
-      )}
-      {/* Radio tower */}
-      <path d="M1210 420 L1232 170 L1238 170 L1260 420 Z" fill={far} />
-      <rect x="1233" y="120" width="4" height="52" fill={far} />
-      <circle cx="1235" cy="118" r="4" fill="#ff3b30" />
+      <circle cx="1120" cy="150" r="150" fill="url(#pv-orb)" />
+      <circle cx="1120" cy="150" r={night ? 30 : 40} fill={night ? "#f6f1df" : "#fff6dc"} />
+      <path d="M1250 420 L1270 170 L1276 170 L1296 420 Z" fill={far} />
+      <rect x="1271" y="120" width="4" height="52" fill={far} />
+      <circle cx="1273" cy="118" r="3.5" fill="#ff3b30" />
       {far1.map(([x, top, w]) => (
         <rect key={`f${x}`} x={x} y={top} width={w} height={560 - top} fill={far} />
       ))}
+      <rect width="1440" height="560" fill="url(#pv-haze)" />
       {near1.map(([x, top, w]) => (
         <g key={`n${x}`}>
-          <rect x={x} y={top} width={w} height={560 - top} fill={near} />
-          {Array.from({ length: Math.floor((560 - top) / 26) }, (_, r) =>
-            Array.from({ length: Math.floor(w / 22) }, (_, c) =>
-              (r + c + x) % 3 !== 0 ? <rect key={`${r}-${c}`} x={x + 6 + c * 22} y={top + 10 + r * 26} width="10" height="12" fill={windowOn} opacity={night ? 0.9 : 0.5} /> : null,
+          <rect x={x} y={top} width={w} height={560 - top} fill="url(#pv-near)" />
+          <rect x={x} y={top} width={w} height="3" fill={night ? "#26305a" : "#8fa7b8"} />
+          {Array.from({ length: Math.floor((560 - top) / 22) }, (_, r) =>
+            Array.from({ length: Math.floor(w / 18) }, (_, c) =>
+              (r * 7 + c * 3 + x) % 5 === 0 ? (
+                <rect key={`${r}-${c}`} x={x + 5 + c * 18} y={top + 12 + r * 22} width="8" height="10" fill={lit} opacity={night ? 0.75 : 0.35} />
+              ) : null,
             ),
           )}
         </g>
       ))}
-      <path d="M0 500 C 300 470, 640 490, 900 480 S 1300 470, 1440 490 V560 H0 Z" fill={ground} />
+      <path d="M0 505 C 300 490, 640 500, 900 495 S 1300 490, 1440 500 V560 H0 Z" fill={ground} />
     </svg>
   );
 }

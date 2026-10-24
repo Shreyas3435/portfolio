@@ -1,191 +1,151 @@
-import { LANTERNS } from "./art";
+import { FAIRY_LIGHTS } from "./art";
 import type { DecorKind, Place } from "./places";
-import { type Ctx, C, glow, rgba, shade } from "./paint";
+import { type Ctx, glow, rgba } from "./paint";
 
-// Per-frame animation drawn on top of cached sprites. Plain shapes only, so
-// they stay cheap. `t` is world time in seconds; `near` is true while the
-// player is parked at the place.
+// Per-frame animation on top of the cached aerial sprites. Plain shapes only,
+// so it stays cheap. `t` is world time in seconds.
 
-export interface OverlaySprites {
-  gear: HTMLCanvasElement;
-  magnifier: HTMLCanvasElement;
-}
-
-function puff(ctx: Ctx, x: number, y: number, s: number, a: number) {
-  ctx.globalAlpha = a;
-  ctx.fillStyle = "#f4f7fa";
-  ctx.beginPath();
-  ctx.arc(x, y, s, 0, Math.PI * 2);
-  ctx.arc(x + s * 0.6, y + s * 0.2, s * 0.7, 0, Math.PI * 2);
-  ctx.arc(x - s * 0.6, y + s * 0.25, s * 0.65, 0, Math.PI * 2);
-  ctx.fill();
+/** Smoke drifting downwind from a chimney (seen from above). */
+function smoke(ctx: Ctx, x: number, y: number, t: number, n = 5) {
+  for (let k = 0; k < n; k++) {
+    const ph = (((t * 0.18 + k / n) % 1) + 1) % 1;
+    const px = x + ph * 120 + Math.sin(t * 0.7 + k) * 6;
+    const py = y + ph * 40;
+    const s = 8 + ph * 26;
+    ctx.globalAlpha = (1 - ph) * 0.45;
+    ctx.fillStyle = "#e9ebec";
+    ctx.beginPath();
+    ctx.arc(px, py, s, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.globalAlpha = 1;
 }
 
-function smoke(ctx: Ctx, x: number, y: number, t: number, n = 4) {
-  for (let k = 0; k < n; k++) {
-    const ph = (t * 0.22 + k / n) % 1;
-    puff(ctx, x + ph * 46 + Math.sin(t + k) * 6, y - ph * 130, 8 + ph * 16, (1 - ph) * 0.75);
-  }
-}
-
-function blink(ctx: Ctx, x: number, y: number, t: number, phase: number) {
-  const on = Math.sin(t * 3 + phase) > 0.4;
-  if (!on) return;
-  glow(ctx, x, y, 16, "#ff3b30", 0.8);
-  ctx.fillStyle = "#ffd0cc";
+function beacon(ctx: Ctx, x: number, y: number, t: number, phase = 0) {
+  if (Math.sin(t * 3 + phase) < 0.5) return;
+  glow(ctx, x, y, 14, "#ff3b30", 0.9);
+  ctx.fillStyle = "#ffd6d2";
   ctx.beginPath();
-  ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+  ctx.arc(x, y, 2, 0, Math.PI * 2);
   ctx.fill();
 }
 
-export function drawPlaceOverlay(ctx: Ctx, p: Place, t: number, s: OverlaySprites, near: boolean) {
+export function drawPlaceOverlay(ctx: Ctx, p: Place, t: number, near: boolean) {
   const { x, y } = p;
   switch (p.id) {
     case "shadowpath": {
-      // Rotating radar dish on the cabin roof + aviation lights.
-      const a = t * 1.6;
-      const cx = x;
-      const cy = y - 356;
-      const w = Math.cos(a) * 26;
-      ctx.fillStyle = "#5f6873";
-      ctx.fillRect(cx - 2, cy, 4, 10);
+      // Rotating radar dish on the tower roof.
+      ctx.save();
+      ctx.translate(x - 4, y - 8);
+      ctx.rotate(t * 1.4);
+      ctx.fillStyle = "rgba(10,18,26,0.35)";
+      ctx.fillRect(-15, -3, 34, 10);
       ctx.beginPath();
-      ctx.ellipse(cx, cy - 6, Math.max(2, Math.abs(w)), 12, 0, 0, Math.PI * 2);
-      shade(ctx, cx - 26, cy - 18, cx + 26, cy + 6, "#ffffff", "#d3d9e0", "#8a939e");
-      ctx.strokeStyle = "#5f6873";
-      ctx.lineWidth = 1.5;
+      ctx.ellipse(0, 0, 18, 6, 0, 0, Math.PI * 2);
+      ctx.fillStyle = "#e9ebec";
+      ctx.fill();
+      ctx.strokeStyle = "#7d848b";
+      ctx.lineWidth = 1.2;
       ctx.stroke();
-      blink(ctx, x, y - 404, t, 0);
-      blink(ctx, x - 46, y - 300, t, 1.5);
-      blink(ctx, x + 46, y - 300, t, 1.5);
-      for (let k = 0; k < 2; k++) {
-        const ph = (t * 0.4 + k * 0.5) % 1;
-        ctx.strokeStyle = p.color;
-        ctx.globalAlpha = (1 - ph) * 0.5;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.ellipse(x, y + 4, 70 + ph * 150, (70 + ph * 150) * 0.32, 0, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      ctx.globalAlpha = 1;
+      ctx.fillStyle = "#5f666d";
+      ctx.fillRect(-2, -2, 16, 4);
+      ctx.restore();
+      beacon(ctx, x + 38, y - 30, t);
+      beacon(ctx, x - 38, y + 30, t, 1.6);
       break;
     }
     case "industrial-product-search": {
-      ctx.save();
-      ctx.translate(x + 160, y - 112);
-      ctx.rotate(t * 0.7);
-      ctx.drawImage(s.gear, -60, -60, 120, 120);
-      ctx.restore();
-      smoke(ctx, x + 51, y - 276, t);
-      break;
-    }
-    case "trek-saathi": {
-      const fx = x - 176;
-      const fy = y - 40;
-      ctx.strokeStyle = "#3a2410";
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.moveTo(fx, fy);
-      ctx.lineTo(fx, fy - 54);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(fx, fy - 54);
-      for (let i = 0; i <= 8; i++) {
-        const u = i / 8;
-        ctx.lineTo(fx + u * 40, fy - 54 + Math.sin(t * 5 - u * 4) * 3.5 * u);
-      }
-      for (let i = 8; i >= 0; i--) {
-        const u = i / 8;
-        ctx.lineTo(fx + u * 40, fy - 30 + Math.sin(t * 5 - u * 4) * 3.5 * u);
-      }
-      ctx.closePath();
-      ctx.fillStyle = p.color;
-      ctx.fill();
-      break;
-    }
-    case "website-content-search": {
-      for (let k = 0; k < 3; k++) {
-        const ph = (t * 0.25 + k / 3) % 1;
-        const cx = x - 300 + ph * 250;
-        const cy = y - 170 - k * 36 + Math.sin(t * 2 + k) * 8;
-        ctx.globalAlpha = Math.sin(ph * Math.PI) * 0.95;
+      for (const fx of [-110, -60]) {
         ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(Math.sin(t + k) * 0.2);
-        ctx.fillStyle = "rgba(20,40,60,0.2)";
-        ctx.fillRect(-17, -11, 38, 26);
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(-19, -13, 38, 26);
-        ctx.fillStyle = rgba(p.color, 0.7);
-        for (let l = 0; l < 3; l++) ctx.fillRect(-13, -6 + l * 7, 24 - l * 5, 2.5);
+        ctx.translate(x + fx, y + 44);
+        ctx.rotate(t * 4);
+        ctx.fillStyle = "#4a5056";
+        for (let i = 0; i < 4; i++) {
+          ctx.rotate(Math.PI / 2);
+          ctx.fillRect(-1.5, 0, 3, 8);
+        }
         ctx.restore();
       }
-      ctx.globalAlpha = 1;
-      const a = t * 0.6;
-      ctx.save();
-      ctx.translate(x + 130 + Math.cos(a) * 26, y - 300 + Math.sin(a * 1.3) * 14);
-      ctx.rotate(Math.sin(t * 0.8) * 0.2);
-      ctx.drawImage(s.magnifier, -50, -50, 100, 100);
-      ctx.restore();
+      smoke(ctx, x + 110, y - 46, t);
       break;
     }
     case "workshop": {
-      const on = Math.sin(t * 17) > -0.85;
-      if (on) glow(ctx, x, y - 132, 70, C.neonCyan, 0.35);
-      break;
-    }
-    case "about":
-      smoke(ctx, x + 61, y - 266, t, 3);
-      break;
-    case "skills":
-      for (let i = 0; i < LANTERNS.length; i++) {
-        const [lx, ly, c] = LANTERNS[i];
-        const pulse = 0.55 + Math.sin(t * 2.2 + i * 1.3) * 0.25 + (near ? 0.25 : 0);
-        const bob = Math.sin(t * 1.4 + i) * 4;
-        glow(ctx, x + lx, y + ly + bob, 26 + pulse * 10, c, pulse * 0.7);
-        ctx.fillStyle = "#ffffff";
-        ctx.beginPath();
-        ctx.arc(x + lx, y + ly + bob, 4.5, 0, Math.PI * 2);
-        ctx.fill();
+      // Welding sparks at the open door.
+      for (let k = 0; k < 6; k++) {
+        const ph = (t * 1.8 + k / 6) % 1;
+        const a = k * 1.7 + Math.floor(t * 1.8 + k / 6) * 2.3;
+        const sx = x + Math.cos(a) * ph * 30;
+        const sy = y + p.h / 2 + 12 + Math.sin(a) * ph * 18;
+        ctx.globalAlpha = 1 - ph;
+        ctx.fillStyle = ph < 0.3 ? "#fff6d0" : "#ffb347";
+        ctx.fillRect(sx, sy, 2.2, 2.2);
       }
-      break;
-    case "github": {
-      const flick = Math.sin(t * 13) > 0.92 ? 0.12 : 0.35;
-      glow(ctx, x, y - 117, 70, "#00e676", flick);
+      ctx.globalAlpha = 1;
+      if (Math.sin(t * 23) > 0.3) glow(ctx, x, y + p.h / 2 + 12, 24, "#bfe6ff", 0.4);
       break;
     }
-    case "email": {
-      const ex = x + Math.sin(t * 1.2) * 30;
-      const ey = y - 196 + Math.sin(t * 2.3) * 8;
+    case "website-content-search": {
+      // The observatory dome slowly turns its slit.
       ctx.save();
-      ctx.translate(ex, ey);
-      ctx.rotate(Math.sin(t * 1.7) * 0.2);
-      ctx.fillStyle = "rgba(20,40,60,0.2)";
-      ctx.fillRect(-14, -8, 32, 20);
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(-16, -10, 32, 20);
-      ctx.strokeStyle = p.color;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(-16, -10);
-      ctx.lineTo(0, 2);
-      ctx.lineTo(16, -10);
-      ctx.stroke();
+      ctx.translate(x + 80, y - 10);
+      ctx.rotate(t * 0.25);
+      ctx.fillStyle = "#2b3238";
+      ctx.fillRect(-5, -46, 10, 46);
       ctx.restore();
       break;
     }
+    case "trek-saathi":
+      smoke(ctx, x + 81, y - 49, t, 4);
+      // Hot-tub steam.
+      for (let k = 0; k < 3; k++) {
+        const ph = (t * 0.4 + k / 3) % 1;
+        ctx.globalAlpha = (1 - ph) * 0.3;
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(x - p.w / 2 + 40 + ph * 20, y + p.h / 2 - 20 - ph * 16, 6 + ph * 8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      break;
+    case "about": {
+      // Shimmer on the pool.
+      const px = x - p.w / 2 + 18;
+      const py = y + p.h / 2 - 22 - 12;
+      ctx.strokeStyle = "rgba(255,255,255,0.55)";
+      ctx.lineWidth = 1.2;
+      for (let k = 0; k < 4; k++) {
+        const ox = ((t * 12 + k * 23) % 92) + px;
+        ctx.beginPath();
+        ctx.moveTo(ox, py + 4 + k * 5);
+        ctx.quadraticCurveTo(ox + 6, py + 1 + k * 5, ox + 12, py + 4 + k * 5);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "skills":
+      for (let i = 0; i < FAIRY_LIGHTS.length; i++) {
+        const [lx, ly] = FAIRY_LIGHTS[i];
+        const tw = 0.5 + 0.5 * Math.sin(t * 2.6 + i * 1.7);
+        glow(ctx, x + lx, y + ly, 9 + tw * 6, "#ffe6a6", 0.35 + tw * 0.35 + (near ? 0.2 : 0));
+      }
+      break;
+    case "linkedin":
+      beacon(ctx, x - 72, y - 72, t);
+      beacon(ctx, x + 72, y - 72, t, 0.6);
+      beacon(ctx, x - 72, y + 72, t, 1.2);
+      beacon(ctx, x + 72, y + 72, t, 1.8);
+      break;
   }
   if (near) {
     const [fx, fy] = p.front;
     const s2 = 1 + Math.sin(t * 4) * 0.05;
-    glow(ctx, fx, fy, 70, p.color, 0.25);
-    ctx.strokeStyle = rgba(p.color, 0.9);
+    glow(ctx, fx, fy, 60, p.color, 0.22);
+    ctx.strokeStyle = rgba(p.color, 0.95);
     ctx.lineWidth = 3;
     ctx.setLineDash([12, 10]);
     ctx.lineDashOffset = -t * 30;
     ctx.beginPath();
-    ctx.ellipse(fx, fy, 56 * s2, 22 * s2, 0, 0, Math.PI * 2);
+    ctx.arc(fx, fy, 44 * s2, 0, Math.PI * 2);
     ctx.stroke();
     ctx.setLineDash([]);
   }
@@ -193,91 +153,36 @@ export function drawPlaceOverlay(ctx: Ctx, p: Place, t: number, s: OverlaySprite
 
 export function drawDecorOverlay(ctx: Ctx, kind: DecorKind, x: number, y: number, t: number) {
   if (kind === "fountain") {
-    ctx.strokeStyle = "rgba(225, 248, 255, 0.9)";
-    ctx.lineWidth = 2.5;
-    for (let k = 0; k < 6; k++) {
-      const a = (k / 6) * Math.PI * 2 + t * 0.3;
-      const dx = Math.cos(a) * 58;
-      const dy = Math.sin(a) * 22;
+    // Spray ring and ripples, seen from above.
+    for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2 + t * 0.4;
+      const r1 = 22 + ((t * 40 + k * 7) % 38);
+      ctx.globalAlpha = 0.7 - (r1 - 22) / 60;
+      ctx.fillStyle = "#ffffff";
       ctx.beginPath();
-      ctx.moveTo(x, y - 74);
-      ctx.quadraticCurveTo(x + dx * 0.5, y - 104, x + dx, y - 6 + dy);
-      ctx.stroke();
+      ctx.arc(x + Math.cos(a) * r1, y + Math.sin(a) * r1, 2.4, 0, Math.PI * 2);
+      ctx.fill();
     }
     for (let k = 0; k < 3; k++) {
-      const ph = (t * 0.6 + k / 3) % 1;
-      ctx.strokeStyle = `rgba(255,255,255,${(1 - ph) * 0.6})`;
+      const ph = (t * 0.5 + k / 3) % 1;
+      ctx.globalAlpha = (1 - ph) * 0.5;
+      ctx.strokeStyle = "#ffffff";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.ellipse(x, y - 4, 20 + ph * 50, (20 + ph * 50) * 0.38, 0, 0, Math.PI * 2);
+      ctx.arc(x, y, 26 + ph * 52, 0, Math.PI * 2);
       ctx.stroke();
     }
+    ctx.globalAlpha = 1;
   } else if (kind === "campfire") {
-    const flick = (k: number) => 0.85 + Math.sin(t * 11 + k * 1.7) * 0.1 + Math.sin(t * 17 + k) * 0.06;
-    glow(ctx, x, y - 20, 90, "#ffb347", 0.3 + Math.sin(t * 9) * 0.04);
-    const flames: [string, number, number][] = [["#ff5a1f", 22, 0], ["#ffa53a", 15, 1], ["#ffe08a", 9, 2]];
-    for (const [c, h, k] of flames) {
-      const fh = h * 2.2 * flick(k);
-      const fx = x + Math.sin(t * 6 + k) * 2;
-      const fy = y - 8;
-      ctx.beginPath();
-      ctx.moveTo(fx - h * 0.7, fy);
-      ctx.quadraticCurveTo(fx - h * 0.8, fy - fh * 0.6, fx, fy - fh);
-      ctx.quadraticCurveTo(fx + h * 0.8, fy - fh * 0.6, fx + h * 0.7, fy);
-      ctx.closePath();
-      shade(ctx, fx, fy - fh, fx, fy, "#fff4c2", c, c);
+    const flick = 0.85 + Math.sin(t * 11) * 0.1 + Math.sin(t * 17) * 0.06;
+    glow(ctx, x, y, 70 * flick, "#ff9a3c", 0.45);
+    glow(ctx, x, y, 26 * flick, "#ffe08a", 0.9);
+    for (let k = 0; k < 4; k++) {
+      const ph = (t * 0.9 + k / 4) % 1;
+      ctx.globalAlpha = 1 - ph;
+      ctx.fillStyle = "#ffb347";
+      ctx.fillRect(x + Math.sin(t * 3 + k) * 10 + ph * 30, y - ph * 10, 2, 2);
     }
+    ctx.globalAlpha = 1;
   }
-}
-
-export function makeOverlaySprites(scale: number): OverlaySprites {
-  const mk = (size: number, draw: (c: Ctx) => void) => {
-    const c = document.createElement("canvas");
-    c.width = c.height = Math.ceil(size * scale);
-    const g = c.getContext("2d")!;
-    g.scale(scale, scale);
-    g.translate(size / 2, size / 2);
-    draw(g);
-    return c;
-  };
-  const gear = mk(120, (g) => {
-    const teeth = 10;
-    g.beginPath();
-    for (let i = 0; i < teeth * 2; i++) {
-      const a0 = (i / (teeth * 2)) * Math.PI * 2;
-      const a1 = ((i + 1) / (teeth * 2)) * Math.PI * 2;
-      const rad = i % 2 === 0 ? 56 : 44;
-      g.lineTo(Math.cos(a0) * rad, Math.sin(a0) * rad);
-      g.lineTo(Math.cos(a1) * rad, Math.sin(a1) * rad);
-    }
-    g.closePath();
-    shade(g, -56, -56, 56, 56, "#ffd37a", "#ffab00", "#a86400");
-    g.strokeStyle = "#7a4a00";
-    g.lineWidth = 1.5;
-    g.stroke();
-    g.fillStyle = "#4a525c";
-    g.beginPath();
-    g.arc(0, 0, 14, 0, Math.PI * 2);
-    g.fill();
-  });
-  const magnifier = mk(100, (g) => {
-    g.strokeStyle = "#38424f";
-    g.lineWidth = 9;
-    g.lineCap = "round";
-    g.beginPath();
-    g.moveTo(20, 20);
-    g.lineTo(42, 42);
-    g.stroke();
-    const lens = g.createRadialGradient(-14, -14, 2, -6, -6, 32);
-    lens.addColorStop(0, "rgba(255,255,255,0.9)");
-    lens.addColorStop(1, "rgba(140,210,255,0.5)");
-    g.fillStyle = lens;
-    g.beginPath();
-    g.arc(-6, -6, 30, 0, Math.PI * 2);
-    g.fill();
-    g.strokeStyle = "#2979ff";
-    g.lineWidth = 6;
-    g.stroke();
-  });
-  return { gear, magnifier };
 }
