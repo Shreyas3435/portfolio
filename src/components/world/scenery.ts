@@ -1,5 +1,5 @@
 import type { Foliage, PropKind } from "./art";
-import { DECOR, EDGE, NAME, PLAZA, PONDS, TAGLINE, WORLD_H, WORLD_W, districts, places, roads } from "./places";
+import { DECOR, EDGE, NAME, PITCH, PLAZA, PONDS, TAGLINE, WORLD_H, WORLD_W, districts, places, roads } from "./places";
 import { type Ctx, type Pt, C, blobPath, dab, mulberry32, pick, range, rgba, text } from "./paint";
 
 export const TILE = 512;
@@ -48,7 +48,15 @@ interface Flat {
   color: string;
 }
 
+export interface Field {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface WorldData {
+  fields: Field[];
   standing: Standing[];
   props: Prop[];
   flats: Map<string, Flat[]>;
@@ -96,6 +104,19 @@ export function buildWorld(): WorldData {
     return false;
   };
 
+  const fields: Field[] = [];
+  for (let tries = 0; fields.length < 9 && tries < 400; tries++) {
+    const w = range(r, 200, 300);
+    const h = range(r, 130, 190);
+    const x = range(r, EDGE + 40, WORLD_W - EDGE - 40 - w);
+    const y = range(r, EDGE + 60, WORLD_H - EDGE - 40 - h);
+    const corners: Pt[] = [[x, y], [x + w, y], [x, y + h], [x + w, y + h], [x + w / 2, y + h / 2]];
+    if (corners.some(([cx, cy]) => blocked(cx, cy, 30))) continue;
+    if (fields.some((f) => x < f.x + f.w + 40 && x + w + 40 > f.x && y < f.y + f.h + 40 && y + h + 40 > f.y)) continue;
+    fields.push({ x, y, w, h });
+  }
+  const onField = (x: number, y: number, pad: number) => fields.some((f) => x > f.x - pad && x < f.x + f.w + pad && y > f.y - pad && y < f.y + f.h + pad);
+
   const standing: Standing[] = [];
   const crowded = (x: number, y: number, d: number) => standing.some((s) => Math.abs(s.x - x) < d && Math.abs(s.y - y) < d * 0.8);
   const scatter = (
@@ -109,7 +130,7 @@ export function buildWorld(): WorldData {
       const x = range(r, 0, WORLD_W);
       const y = range(r, 0, WORLD_H);
       if (where && !where(x, y)) continue;
-      if (blocked(x, y, pad)) continue;
+      if (blocked(x, y, pad) || onField(x, y, 20)) continue;
       if (spacing && crowded(x, y, spacing)) continue;
       standing.push({ kind, x, y, s: range(r, sMin, sMax), variant: Math.floor(r() * 3) });
       placed++;
@@ -118,20 +139,21 @@ export function buildWorld(): WorldData {
   const nearEdge = (x: number, y: number) => Math.min(x, y, WORLD_W - x, WORLD_H - y) < 300;
   const nearDistrict = (x: number, y: number) =>
     districts.some((d) => inEllipse(x, y, d.court.x, d.court.y, d.court.rx + 360, d.court.ry + 300));
-  scatter("tree", 90, { spacing: 54, where: nearEdge });
-  scatter("tree", 60, { spacing: 60 });
-  scatter("tree2", 60, { spacing: 60 });
-  scatter("maple", 30, { spacing: 70, where: nearDistrict });
-  scatter("pine", 60, { spacing: 46 });
-  scatter("rock", 34, { spacing: 40, sMin: 0.7, sMax: 1.4 });
-  scatter("bush", 90, { pad: 0, sMin: 0.8, sMax: 1.2 });
+  // Kept deliberately sparse so there's lots of open ground to drive on.
+  scatter("palm", 50, { spacing: 80, where: nearEdge });
+  scatter("palm", 22, { spacing: 110, pad: 30, where: nearDistrict });
+  scatter("areca", 24, { spacing: 90, where: nearEdge });
+  scatter("mango", 26, { spacing: 120, pad: 30 });
+  scatter("neem", 22, { spacing: 120, pad: 30 });
+  scatter("rock", 14, { spacing: 120, pad: 30, sMin: 0.7, sMax: 1.3 });
+  scatter("bush", 70, { pad: 0, sMin: 0.8, sMax: 1.2 });
   standing.sort((a, b) => a.y - b.y);
 
   const colliders: Collider[] = [];
   standing.forEach((s, i) => {
-    if (s.kind === "tree" || s.kind === "tree2" || s.kind === "maple") colliders.push({ x: s.x, y: s.y - 8 * s.s, r: 16 * s.s, ref: { type: "tree", i } });
-    else if (s.kind === "pine") colliders.push({ x: s.x, y: s.y - 6 * s.s, r: 13 * s.s, ref: { type: "tree", i } });
-    else if (s.kind === "rock") colliders.push({ x: s.x, y: s.y - 10 * s.s, r: 18 * s.s, ref: { type: "solid" } });
+    if (s.kind === "mango" || s.kind === "neem") colliders.push({ x: s.x, y: s.y - 6 * s.s, r: 12 * s.s, ref: { type: "tree", i } });
+    else if (s.kind === "palm" || s.kind === "areca") colliders.push({ x: s.x, y: s.y - 4, r: 8 * s.s, ref: { type: "tree", i } });
+    else if (s.kind === "rock") colliders.push({ x: s.x, y: s.y - 10 * s.s, r: 15 * s.s, ref: { type: "solid" } });
   });
 
   // Breakable props.
@@ -177,7 +199,7 @@ export function buildWorld(): WorldData {
     for (const [dx, dy, cr] of p.colliders) colliders.push({ x: p.x + dx, y: p.y + dy, r: cr, ref: { type: "place", i } });
   });
   for (const d of districts) for (const s of [-1, 1]) colliders.push({ x: d.gate.x + s * 122, y: d.gate.y - 6, r: 16, ref: { type: "solid" } });
-  for (const d of DECOR) colliders.push({ x: d.x, y: d.y - 4, r: d.kind === "fountain" ? 84 : d.r, ref: { type: "solid" } });
+  for (const d of DECOR) colliders.push({ x: d.x, y: d.y - 4, r: d.kind === "tank" ? 92 : d.r, ref: { type: "solid" } });
   const fire = DECOR.find((d) => d.kind === "campfire")!;
   for (const s of [-1, 1]) colliders.push({ x: fire.x + s * 100, y: fire.y - 8, r: 22, ref: { type: "solid" } });
 
@@ -206,7 +228,7 @@ export function buildWorld(): WorldData {
     const s = range(r, 90, 260);
     addFlat({ kind: "blotch", x: range(r, 0, WORLD_W), y: range(r, 0, WORLD_H), s, seed: 0, color: pick(r, blotchColors) }, s);
   }
-  const flowerColors = ["#fff6e0", "#ffd34d", "#ff9a3d", "#ffffff", "#e8c547", "#9fc4e8"];
+  const flowerColors = ["#ffa000", "#ffd54f", "#ffffff", "#e53935", "#ff6f00", "#fff59d"];
   for (let placed = 0, tries = 0; placed < 300 && tries < 6000; tries++) {
     const x = range(r, 0, WORLD_W);
     const y = range(r, 0, WORLD_H);
@@ -222,7 +244,7 @@ export function buildWorld(): WorldData {
     placed++;
   }
 
-  return { standing, props, flats, roadPts, colliders, grid };
+  return { fields, standing, props, flats, roadPts, colliders, grid };
 }
 
 export function queryColliders(w: WorldData, x: number, y: number, out: Set<number>) {
@@ -258,7 +280,7 @@ function paintRoad(ctx: Ctx, pts: Pt[]) {
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   for (const [color, width] of [
-    [rgba("#5d5030", 0.22), ROAD_W + 16],
+    [rgba("#5a2a14", 0.25), ROAD_W + 16],
     [C.pathDark, ROAD_W],
     [C.path, ROAD_W - 12],
     [rgba(C.pathLight, 0.7), ROAD_W * 0.35],
@@ -269,7 +291,7 @@ function paintRoad(ctx: Ctx, pts: Pt[]) {
     ctx.stroke();
   }
   // Wheel ruts.
-  ctx.strokeStyle = rgba("#b08d5c", 0.35);
+  ctx.strokeStyle = rgba("#8a4424", 0.4);
   ctx.lineWidth = 3;
   ctx.setLineDash([22, 16]);
   for (const off of [-12, 12]) {
@@ -311,18 +333,21 @@ function paintCourt(ctx: Ctx, d: (typeof districts)[number]) {
     }
     return;
   }
-  const sand = surface === "sand";
+  if (surface === "sand") {
+    paintCricketGround(ctx, d.court);
+    return;
+  }
   ctx.fillStyle = rgba("#5b6b4f", 0.25);
   ctx.beginPath();
   ctx.ellipse(x, y + 6, rx + 14, ry + 12, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = sand ? "#d4b77c" : C.stoneDark;
+  ctx.fillStyle = C.stoneDark;
   ctx.beginPath();
   ctx.ellipse(x, y, rx + 8, ry + 8, 0, 0, Math.PI * 2);
   ctx.fill();
   const g = ctx.createRadialGradient(x - rx * 0.3, y - ry * 0.4, 20, x, y, rx);
-  g.addColorStop(0, sand ? "#f8ebc8" : "#f1ece1");
-  g.addColorStop(1, sand ? "#ecd6a4" : C.stone);
+  g.addColorStop(0, "#f1ece1");
+  g.addColorStop(1, C.stone);
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
@@ -331,36 +356,86 @@ function paintCourt(ctx: Ctx, d: (typeof districts)[number]) {
   ctx.beginPath();
   ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
   ctx.clip();
-  if (!sand) {
-    ctx.strokeStyle = rgba("#8f8471", 0.22);
-    ctx.lineWidth = 1.5;
-    for (let k = 1; k < 8; k++) {
-      ctx.beginPath();
-      ctx.ellipse(x, y, (rx * k) / 8, (ry * k) / 8, 0, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    for (let k = 0; k < 48; k++) {
-      const a = (k / 48) * Math.PI * 2;
-      ctx.beginPath();
-      ctx.moveTo(x + Math.cos(a) * rx * 0.12, y + Math.sin(a) * ry * 0.12);
-      ctx.lineTo(x + Math.cos(a) * rx, y + Math.sin(a) * ry);
-      ctx.stroke();
-    }
-    ctx.fillStyle = rgba("#ffffff", 0.12);
-    for (let k = 0; k < 120; k++) {
-      ctx.beginPath();
-      ctx.ellipse(x + range(r, -rx, rx), y + range(r, -ry, ry), range(r, 6, 14), range(r, 3, 6), 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  } else {
-    ctx.fillStyle = rgba("#b8975e", 0.25);
-    for (let k = 0; k < 220; k++) {
-      ctx.beginPath();
-      ctx.arc(x + range(r, -rx, rx), y + range(r, -ry, ry), range(r, 1, 2.4), 0, Math.PI * 2);
-      ctx.fill();
-    }
+  ctx.strokeStyle = rgba("#8f8471", 0.22);
+  ctx.lineWidth = 1.5;
+  for (let k = 1; k < 8; k++) {
+    ctx.beginPath();
+    ctx.ellipse(x, y, (rx * k) / 8, (ry * k) / 8, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  for (let k = 0; k < 48; k++) {
+    const a = (k / 48) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(a) * rx * 0.12, y + Math.sin(a) * ry * 0.12);
+    ctx.lineTo(x + Math.cos(a) * rx, y + Math.sin(a) * ry);
+    ctx.stroke();
+  }
+  ctx.fillStyle = rgba("#ffffff", 0.12);
+  for (let k = 0; k < 120; k++) {
+    ctx.beginPath();
+    ctx.ellipse(x + range(r, -rx, rx), y + range(r, -ry, ry), range(r, 6, 14), range(r, 3, 6), 0, 0, Math.PI * 2);
+    ctx.fill();
   }
   ctx.restore();
+}
+
+function paintCricketGround(ctx: Ctx, c: (typeof districts)[number]["court"]) {
+  const { x, y, rx, ry } = c;
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "#4fa83c";
+  ctx.fill();
+  ctx.clip();
+  // Mowing stripes.
+  ctx.fillStyle = "#5cb848";
+  for (let sx = x - rx; sx < x + rx; sx += 60) ctx.fillRect(sx, y - ry, 30, ry * 2);
+  ctx.restore();
+  // Boundary rope.
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 3;
+  ctx.setLineDash([14, 8]);
+  ctx.beginPath();
+  ctx.ellipse(x, y, rx - 12, ry - 10, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // The pitch, with creases at both ends.
+  const { x: px, y: py, half } = PITCH;
+  ctx.fillStyle = "#d9b778";
+  ctx.fillRect(px - half - 24, py - 22, (half + 24) * 2, 44);
+  ctx.fillStyle = "rgba(120, 80, 30, 0.2)";
+  ctx.fillRect(px - half - 24, py - 22, (half + 24) * 2, 6);
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 2.5;
+  for (const s of [-1, 1]) {
+    const cx = px + s * (half - 22);
+    ctx.beginPath();
+    ctx.moveTo(cx, py - 22);
+    ctx.lineTo(cx, py + 22);
+    ctx.moveTo(px + s * half, py - 18);
+    ctx.lineTo(px + s * half, py + 18);
+    ctx.stroke();
+  }
+}
+
+function paintField(ctx: Ctx, f: Field) {
+  ctx.fillStyle = "#7a4a26";
+  ctx.fillRect(f.x - 5, f.y - 5, f.w + 10, f.h + 10);
+  ctx.fillStyle = "#8fd14f";
+  ctx.fillRect(f.x, f.y, f.w, f.h);
+  ctx.fillStyle = "rgba(60, 120, 180, 0.18)";
+  ctx.fillRect(f.x, f.y, f.w, f.h);
+  ctx.strokeStyle = "#b9ea6e";
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  for (let yy = f.y + 7; yy < f.y + f.h - 3; yy += 9) {
+    ctx.beginPath();
+    for (let xx = f.x + 5; xx < f.x + f.w - 4; xx += 7) {
+      ctx.moveTo(xx, yy + 2);
+      ctx.lineTo(xx + 1.5, yy - 3);
+    }
+    ctx.stroke();
+  }
 }
 
 function paintPond(ctx: Ctx, p: (typeof PONDS)[number]) {
@@ -432,18 +507,30 @@ function paintPlaza(ctx: Ctx) {
   ctx.beginPath();
   ctx.ellipse(x, y, rr, rr * 0.82, 0, 0, Math.PI * 2);
   ctx.fill();
-  // Mosaic star in the district colours.
-  for (let k = 0; k < 8; k++) {
-    const a = (k / 8) * Math.PI * 2 - Math.PI / 2;
-    ctx.fillStyle = rgba(districts[k % 4].color, 0.55);
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + Math.cos(a - 0.14) * 40, y + Math.sin(a - 0.14) * 33);
-    ctx.lineTo(x + Math.cos(a) * 96, y + Math.sin(a) * 79);
-    ctx.lineTo(x + Math.cos(a + 0.14) * 40, y + Math.sin(a + 0.14) * 33);
-    ctx.closePath();
-    ctx.fill();
+  // Rangoli: rings of petals and dots in festival colours.
+  const rings: [number, number, string][] = [[96, 16, "#e8601c"], [70, 12, "#ffd54f"], [46, 8, "#00897b"], [24, 6, "#c62828"]];
+  for (const [rad, n, col] of rings) {
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2;
+      ctx.save();
+      ctx.translate(x + Math.cos(a) * rad, y + Math.sin(a) * rad * 0.82);
+      ctx.rotate(a);
+      ctx.scale(1, 0.82);
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, rad * 0.22, rad * 0.09 + 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(x + Math.cos(a + Math.PI / n) * (rad + 8), y + Math.sin(a + Math.PI / n) * (rad + 8) * 0.82, 2.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
+  ctx.fillStyle = "#1565c0";
+  ctx.beginPath();
+  ctx.ellipse(x, y, 10, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.strokeStyle = rgba("#8f8471", 0.35);
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -495,7 +582,7 @@ export function renderTile(w: WorldData, tx: number, ty: number, scale: number):
   // runs across tile edges without seams.
   const strokes: [number, number, number, number, number][] = [];
   for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) strokesFor(tx + dx, ty + dy, strokes);
-  const strokeColors = [rgba("#b5d48a", 0.5), rgba("#3f6f3d", 0.38), rgba("#94bf6c", 0.45)];
+  const strokeColors = [rgba("#b8ec7a", 0.55), rgba("#2f7232", 0.4), rgba("#86cf55", 0.5)];
   ctx.lineCap = "round";
   ctx.lineWidth = 1.8;
   for (let k = 0; k < 3; k++) {
@@ -508,6 +595,7 @@ export function renderTile(w: WorldData, tx: number, ty: number, scale: number):
     ctx.stroke();
   }
 
+  for (const f of w.fields) if (intersects([f.x - 10, f.y - 10, f.x + f.w + 10, f.y + f.h + 10], x0, y0, x1, y1)) paintField(ctx, f);
   for (const p of PONDS) if (intersects([p.x - p.rx - 40, p.y - p.ry - 40, p.x + p.rx + 40, p.y + p.ry + 40], x0, y0, x1, y1)) paintPond(ctx, p);
   for (const d of districts) {
     const { x, y, rx, ry } = d.court;
@@ -560,7 +648,7 @@ export function renderTile(w: WorldData, tx: number, ty: number, scale: number):
   }
 
   if (intersects([TAGLINE.x - 520, TAGLINE.y - 40, TAGLINE.x + 520, TAGLINE.y + 40], x0, y0, x1, y1)) {
-    text(ctx, TAGLINE.text.toUpperCase(), TAGLINE.x, TAGLINE.y, 30, "#fffaf0", { weight: 600, shadow: "rgba(30,60,40,0.45)" });
+    text(ctx, TAGLINE.text, TAGLINE.x, TAGLINE.y, 30, "#fffaf0", { shadow: "rgba(10,40,20,0.6)" });
   }
   return c;
 }

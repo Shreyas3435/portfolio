@@ -20,34 +20,37 @@ export function mulberry32(seed: number): Rand {
 export const range = (r: Rand, min: number, max: number) => min + (max - min) * r();
 export const pick = <T,>(r: Rand, list: readonly T[]) => list[Math.floor(r() * list.length)];
 
-// Late-afternoon palette.
+// Vivid coastal-Karnataka palette.
 export const C = {
-  grass: "#76a35a",
-  grassLight: "#a2c77a",
-  grassDark: "#537d46",
-  grassDeep: "#345c3c",
-  path: "#e6cc9c",
-  pathDark: "#c9a673",
-  pathLight: "#f3e2bd",
-  stone: "#d9d2c3",
-  stoneDark: "#b3a995",
-  water: "#4fa8c7",
-  waterDeep: "#2f7fa5",
-  waterLight: "#9fdcec",
-  shadow: "rgba(28, 52, 48, 0.32)",
-  ink: "#2c3a36",
-  cream: "#fff8ea",
-  wood: "#a8744a",
-  woodDark: "#7a5233",
-  warmLight: "#ffd88a",
+  grass: "#5fae47",
+  grassLight: "#9bd65c",
+  grassDark: "#3f8a3a",
+  grassDeep: "#2a6334",
+  path: "#c8784a",
+  pathDark: "#9c5532",
+  pathLight: "#e09a68",
+  stone: "#d8cfbd",
+  stoneDark: "#a99d86",
+  water: "#1e9ccf",
+  waterDeep: "#0d6fa3",
+  waterLight: "#7fd8f2",
+  shadow: "rgba(20, 40, 60, 0.32)",
+  ink: "#22272b",
+  cream: "#fff6e2",
+  wood: "#9a6236",
+  woodDark: "#6a3f20",
+  warmLight: "#ffcf6a",
+  saffron: "#ff9933",
+  indiaGreen: "#138808",
+  marigold: "#ffa000",
 } as const;
 
 let displayFamily = "serif";
 export function setDisplayFamily(family: string) {
   displayFamily = family;
 }
-export const displayFont = (size: number, weight = 700, italic = false) =>
-  `${italic ? "italic " : ""}${weight} ${size}px ${displayFamily}`;
+// The display face ships a single heavy weight.
+export const displayFont = (size: number) => `400 ${size}px ${displayFamily}`;
 
 /** Mix two hex colours; t = 0 gives a, t = 1 gives b. */
 export function mix(a: string, b: string, t: number) {
@@ -97,11 +100,14 @@ export function polyPath(ctx: Ctx, pts: Pt[]) {
   ctx.closePath();
 }
 
-/** Fill the current path with a light-from-top-left gradient. */
+/** Fill the current path with hard cel-shaded light / base / shadow bands. */
 export function shade(ctx: Ctx, x0: number, y0: number, x1: number, y1: number, light: string, base: string, dark: string) {
   const g = ctx.createLinearGradient(x0, y0, x1, y1);
   g.addColorStop(0, light);
-  g.addColorStop(0.45, base);
+  g.addColorStop(0.28, light);
+  g.addColorStop(0.3, base);
+  g.addColorStop(0.7, base);
+  g.addColorStop(0.72, dark);
   g.addColorStop(1, dark);
   ctx.fillStyle = g;
   ctx.fill();
@@ -113,9 +119,9 @@ export function softShadow(ctx: Ctx, x: number, y: number, rx: number, ry: numbe
   ctx.translate(x, y);
   ctx.scale(1, ry / rx);
   const g = ctx.createRadialGradient(0, 0, rx * 0.1, 0, 0, rx);
-  g.addColorStop(0, `rgba(24, 48, 44, ${alpha})`);
-  g.addColorStop(0.6, `rgba(24, 48, 44, ${alpha * 0.55})`);
-  g.addColorStop(1, "rgba(24, 48, 44, 0)");
+  g.addColorStop(0, `rgba(16, 36, 60, ${alpha})`);
+  g.addColorStop(0.7, `rgba(16, 36, 60, ${alpha * 0.8})`);
+  g.addColorStop(1, "rgba(16, 36, 60, 0)");
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.arc(0, 0, rx, 0, Math.PI * 2);
@@ -172,11 +178,11 @@ export function text(
   color: string,
   o: { weight?: number; italic?: boolean; align?: CanvasTextAlign; alpha?: number; rot?: number; shadow?: string } = {},
 ) {
-  const { weight = 700, italic = false, align = "center", alpha = 1, rot = 0, shadow } = o;
+  const { align = "center", alpha = 1, rot = 0, shadow } = o;
   ctx.save();
   ctx.translate(x, y);
   if (rot) ctx.rotate(rot);
-  ctx.font = displayFont(size, weight, italic);
+  ctx.font = displayFont(size);
   ctx.textAlign = align;
   ctx.textBaseline = "middle";
   ctx.globalAlpha = alpha;
@@ -189,37 +195,22 @@ export function text(
   ctx.restore();
 }
 
-/** Bolted wooden plank sign with a colour stripe, like a trail marker. */
-export function plank(ctx: Ctx, x: number, y: number, label: string, color: string, size = 24) {
-  const str = label.toUpperCase();
-  ctx.font = displayFont(size, 700);
-  const w = ctx.measureText(str).width + size * 1.6;
-  const h = size * 1.55;
+/** Hand-painted Indian shop-style sign board with a contrasting frame. */
+export function board(ctx: Ctx, x: number, y: number, label: string, color: string, size = 24, textColor: string = C.cream) {
+  ctx.font = displayFont(size);
+  const w = ctx.measureText(label).width + size * 1.4;
+  const h = size * 1.6;
   const x0 = x - w / 2;
   const y0 = y - h / 2;
-  ctx.fillStyle = "rgba(20, 30, 25, 0.35)";
+  ctx.fillStyle = "rgba(16, 30, 40, 0.35)";
+  ctx.fillRect(x0 + 4, y0 + 5, w, h);
+  ctx.fillStyle = darken(color, 0.45);
+  ctx.fillRect(x0 - 3, y0 - 3, w + 6, h + 6);
   ctx.beginPath();
-  ctx.roundRect(x0 + 3, y0 + 5, w, h, 4);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.roundRect(x0, y0, w, h, 4);
-  shade(ctx, x0, y0, x0 + w * 0.3, y0 + h, "#93633d", "#6e4729", "#4a2e1b");
-  ctx.strokeStyle = "rgba(0, 0, 0, 0.18)";
-  ctx.lineWidth = 1.2;
-  for (let k = 1; k < 4; k++) {
-    const gy = y0 + (h * k) / 4;
-    ctx.beginPath();
-    ctx.moveTo(x0 + 4, gy);
-    ctx.bezierCurveTo(x0 + w * 0.3, gy - 2, x0 + w * 0.6, gy + 2, x0 + w - 4, gy);
-    ctx.stroke();
-  }
-  ctx.fillStyle = color;
-  ctx.fillRect(x0, y0 + h - 6, w, 6);
-  ctx.fillStyle = "#d8c8a4";
-  for (const bx of [x0 + 7, x0 + w - 7]) {
-    ctx.beginPath();
-    ctx.arc(bx, y0 + 7, 2.2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  text(ctx, str, x, y - 2, size, "#fbf1dc", { shadow: "rgba(0,0,0,0.5)" });
+  ctx.rect(x0, y0, w, h);
+  shade(ctx, x0, y0, x0 + w * 0.35, y0 + h, lighten(color, 0.3), color, darken(color, 0.2));
+  ctx.strokeStyle = rgba("#ffffff", 0.55);
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(x0 + 4, y0 + 4, w - 8, h - 8);
+  text(ctx, label, x, y + size * 0.06, size, textColor, { shadow: "rgba(0,0,0,0.35)" });
 }

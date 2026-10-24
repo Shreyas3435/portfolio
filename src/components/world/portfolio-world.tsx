@@ -132,7 +132,7 @@ export function PortfolioWorld() {
         ref={canvasRef}
         className="absolute inset-0 h-full w-full touch-none"
         style={{ cursor: "grab" }}
-        aria-label="A painted, drivable world of Shreyas Alva's work. Drive the jeep to visit projects, or switch to the page view."
+        aria-label="A painted, drivable world of Shreyas Alva's work. Drive the auto-rickshaw to visit projects, or switch to the page view."
         role="img"
       />
       <div className="world-light pointer-events-none absolute inset-0" />
@@ -178,7 +178,7 @@ export function PortfolioWorld() {
             )}
           >
             <div className="wv-card pointer-events-auto max-w-xs px-4 py-3 text-sm">
-              <p className="font-display text-lg leading-tight font-semibold">Take the jeep for a spin</p>
+              <p className="font-display text-xl leading-tight">Take the auto for a spin</p>
               {touch ? (
                 <ul className="mt-1.5 space-y-1 text-[13px] text-[var(--ink-soft)]">
                   <li>Hold and drag to drive toward your finger</li>
@@ -194,7 +194,7 @@ export function PortfolioWorld() {
                     <kbd className="wv-kbd">D</kbd> or arrows · or click &amp; hold
                   </li>
                   <li>
-                    <kbd className="wv-kbd">Space</kbd> drift · <kbd className="wv-kbd">E</kbd> enter · <kbd className="wv-kbd">M</kbd> map
+                    <kbd className="wv-kbd">Space</kbd> drift · <kbd className="wv-kbd">E</kbd> enter · <kbd className="wv-kbd">H</kbd> honk · <kbd className="wv-kbd">M</kbd> map
                   </li>
                   <li>Smash anything — it rebuilds itself</li>
                 </ul>
@@ -515,7 +515,7 @@ function AboutDetail({ place }: { place: Place }) {
 
 function SkillsDetail({ place }: { place: Place }) {
   const cats = [
-    ["ai", "AI & Search", "#1f7a8c"],
+    ["ai", "AI & Search", "#00897b"],
     ["fullstack", "Full-Stack", "#3e8bff"],
     ["security", "Security", "#e5484d"],
     ["systems", "Systems & Data", "#2f9e62"],

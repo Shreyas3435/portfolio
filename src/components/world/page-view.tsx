@@ -13,7 +13,7 @@ import { placeById } from "./places";
 const levelLabel = { core: "Core", strong: "Strong", working: "Working", exploring: "Exploring" } as const;
 const levelDots = { core: 4, strong: 3, working: 2, exploring: 1 } as const;
 const categoryInfo = {
-  ai: { label: "AI & Search", color: "#1f7a8c" },
+  ai: { label: "AI & Search", color: "#00897b" },
   fullstack: { label: "Full-Stack", color: "#3e8bff" },
   security: { label: "Security", color: "#e5484d" },
   systems: { label: "Systems & Data", color: "#2f9e62" },
@@ -56,53 +56,47 @@ function Hero({ onExplore }: { onExplore: () => void }) {
       <svg className="absolute inset-0 h-full w-full" viewBox="0 0 1440 560" preserveAspectRatio="xMidYMax slice" aria-hidden>
         <defs>
           <linearGradient id="pv-sky" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#9ed3ec" />
-            <stop offset="0.55" stopColor="#fbe3bf" />
-            <stop offset="1" stopColor="#ffd2a1" />
+            <stop offset="0" stopColor="#5fb7e8" />
+            <stop offset="0.5" stopColor="#ffd08a" />
+            <stop offset="1" stopColor="#ff9a4d" />
           </linearGradient>
-          <radialGradient id="pv-sun" cx="0.78" cy="0.42" r="0.35">
-            <stop offset="0" stopColor="#fff6d6" stopOpacity="1" />
-            <stop offset="1" stopColor="#fff6d6" stopOpacity="0" />
+          <radialGradient id="pv-sun" cx="0.74" cy="0.5" r="0.3">
+            <stop offset="0" stopColor="#fff3c4" />
+            <stop offset="0.25" stopColor="#ffd27a" stopOpacity="0.9" />
+            <stop offset="1" stopColor="#ffd27a" stopOpacity="0" />
           </radialGradient>
-          <linearGradient id="pv-h1" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#8fb9a6" />
-            <stop offset="1" stopColor="#6f9f8c" />
-          </linearGradient>
-          <linearGradient id="pv-h2" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#8cc265" />
-            <stop offset="1" stopColor="#5b9150" />
-          </linearGradient>
-          <linearGradient id="pv-h3" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#6fa35a" />
-            <stop offset="1" stopColor="#3f7348" />
-          </linearGradient>
         </defs>
         <rect width="1440" height="560" fill="url(#pv-sky)" />
         <rect width="1440" height="560" fill="url(#pv-sun)" />
-        <g fill="#fffaf0" opacity="0.85">
-          <ellipse cx="260" cy="120" rx="90" ry="22" />
-          <ellipse cx="320" cy="108" rx="60" ry="24" />
-          <ellipse cx="1080" cy="80" rx="110" ry="20" />
-          <ellipse cx="1150" cy="70" rx="60" ry="22" />
-        </g>
-        <path d="M0 380 C 180 280, 320 300, 480 340 S 820 250, 1000 300 S 1300 260, 1440 320 V560 H0 Z" fill="url(#pv-h1)" opacity="0.8" />
-        <path d="M0 430 C 200 380, 380 400, 560 420 S 900 360, 1120 400 S 1340 380, 1440 400 V560 H0 Z" fill="url(#pv-h2)" />
-        <path d="M0 490 C 240 460, 480 480, 720 470 S 1180 450, 1440 480 V560 H0 Z" fill="url(#pv-h3)" />
-        <g fill="#2f5a40">
-          {[[90, 470, 1], [140, 480, 0.8], [190, 470, 1.15], [1230, 450, 1], [1285, 440, 1.25], [1345, 455, 0.9]].map(([x, y, k]) => (
-            <path key={`${x}-${y}`} d={`M${x} ${y - 110 * k} L${x + 34 * k} ${y} L${x - 34 * k} ${y} Z`} />
-          ))}
-        </g>
+        <circle cx="1065" cy="285" r="58" fill="#fff4cc" />
+        <path d="M0 360 L120 300 L230 340 L360 250 L470 320 L600 270 L720 330 L860 240 L980 310 L1100 260 L1240 320 L1340 280 L1440 310 V560 H0 Z" fill="#3f8f8a" opacity="0.75" />
+        <path d="M0 410 L160 360 L300 395 L450 340 L610 395 L760 350 L920 400 L1080 355 L1240 400 L1440 370 V560 H0 Z" fill="#2c7a5a" />
+        {/* Gopuram silhouette */}
+        <path d="M1150 470 V420 H1162 V392 H1172 V366 H1182 V342 H1192 V322 H1218 V342 H1228 V366 H1238 V392 H1248 V420 H1260 V470 Z" fill="#7a3a16" opacity="0.85" />
+        <path d="M0 470 C 240 440, 480 460, 720 450 S 1180 430, 1440 460 V560 H0 Z" fill="#3f8a3a" />
+        <path d="M0 510 C 300 490, 640 505, 900 495 S 1300 490, 1440 505 V560 H0 Z" fill="#2a6334" />
+        {/* Coconut palms */}
+        {[[70, 500, 1], [150, 505, 0.8], [1330, 490, 1.1], [1400, 500, 0.85]].map(([x, y, k]) => (
+          <g key={`${x}-${y}`} fill="#173f20" transform={`translate(${x} ${y}) scale(${k})`}>
+            <path d="M-3 0 Q 4 -70 14 -140 L20 -140 Q 10 -70 3 0 Z" />
+            <path d="M17 -140 q -40 -10 -70 20 q 34 -26 70 -14 Z" />
+            <path d="M17 -140 q 40 -12 72 16 q -36 -22 -72 -10 Z" />
+            <path d="M17 -140 q -10 -40 -44 -54 q 30 22 40 54 Z" />
+            <path d="M17 -140 q 14 -40 50 -50 q -32 20 -44 52 Z" />
+            <path d="M17 -140 q -36 10 -54 50 q 26 -36 54 -46 Z" />
+            <path d="M17 -140 q 36 12 50 54 q -22 -38 -50 -50 Z" />
+          </g>
+        ))}
       </svg>
       <div className="relative mx-auto flex min-h-[520px] max-w-5xl flex-col justify-center px-5 pt-24 pb-28 sm:px-10">
         <p className="pv-pill w-fit">
           <span className="pv-dot" /> Open to work & collaborations
         </p>
-        <h1 className="font-display mt-5 text-6xl leading-[0.9] font-bold tracking-tight text-[#21302c] uppercase sm:text-8xl">{profile.name}</h1>
-        <p className="font-display mt-3 text-xl text-[#2c3a36] italic sm:text-2xl">{profile.role}</p>
-        <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-[#2c3a36] sm:text-base">{profile.heroLine}</p>
+        <h1 className="font-display mt-5 text-6xl leading-[0.95] text-[#1f1a14] sm:text-8xl">{profile.name}</h1>
+        <p className="font-display mt-3 text-xl text-[#3a2410] sm:text-2xl">{profile.role}</p>
+        <p className="mt-5 max-w-xl text-[15px] leading-relaxed font-medium text-[#2a1c10] sm:text-base">{profile.heroLine}</p>
         <div className="mt-7 flex flex-wrap gap-2">
-          <a href={`mailto:${profile.email}`} className="wv-btn wv-btn-solid" style={{ background: "#d9622b" }}>
+          <a href={`mailto:${profile.email}`} className="wv-btn wv-btn-solid" style={{ background: "#e8601c" }}>
             <Mail size={16} /> Get in touch
           </a>
           <a href={profile.resumeUrl} target="_blank" rel="noreferrer noopener" className="wv-btn">
@@ -133,7 +127,7 @@ function Intro() {
   return (
     <section className="pv-section grid gap-8 sm:grid-cols-[1.4fr_1fr]">
       <div>
-        <SectionTitle eyebrow="Hello" title="What I build" color="#d9622b" />
+        <SectionTitle eyebrow="Hello" title="What I build" color="#e8601c" />
         <p className="text-[15px] leading-relaxed">{profile.heroSupport}</p>
         <p className="mt-3 text-[15px] leading-relaxed">{profile.howIThink}</p>
         <ul className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -178,11 +172,11 @@ function Intro() {
 function Projects() {
   return (
     <section className="pv-section">
-      <SectionTitle eyebrow="Flagship work" title="Projects" color="#d9622b" />
+      <SectionTitle eyebrow="Flagship work" title="Projects" color="#e8601c" />
       <div className="grid gap-5 md:grid-cols-2">
         {flagshipProjects.map((p) => {
           const place = placeById(p.id);
-          const color = place?.color ?? "#d9622b";
+          const color = place?.color ?? "#e8601c";
           const ink = place?.ink ?? "#2c3a36";
           return (
             <article key={p.id} className="pv-card pv-project flex flex-col overflow-hidden" style={{ ["--c" as string]: color }}>
@@ -234,7 +228,7 @@ function MoreWork() {
   const notes = ["#f3e7c4", "#dbe6ee", "#dbe9d6", "#f2dcc6", "#e4e1d8", "#e9e3c6"];
   return (
     <section className="pv-section">
-      <SectionTitle eyebrow="The workshop" title="More builds & experiments" color="#5b7083" />
+      <SectionTitle eyebrow="The workshop" title="More builds & experiments" color="#455a64" />
       <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {secondaryProjects.map((p, i) => (
           <li key={p.id} className="pv-note" style={{ background: notes[i % notes.length] }}>
@@ -275,7 +269,7 @@ function Skills() {
   const cats = Object.keys(categoryInfo) as (keyof typeof categoryInfo)[];
   return (
     <section className="pv-section">
-      <SectionTitle eyebrow="The skill tree" title="What I work with" color="#1f7a8c" />
+      <SectionTitle eyebrow="The skill tree" title="What I work with" color="#00897b" />
       <div className="grid gap-4 sm:grid-cols-2">
         {cats.map((c) => (
           <div key={c} className="pv-card p-5">
@@ -341,7 +335,7 @@ function Contact({ onExplore }: { onExplore: () => void }) {
           Full-time roles, freelance projects or a collaboration on something ambitious — I&apos;d love to hear about it.
         </p>
         <div className="mt-6 flex flex-wrap gap-2">
-          <a href={`mailto:${profile.email}`} className="wv-btn wv-btn-solid" style={{ background: "#d9622b" }}>
+          <a href={`mailto:${profile.email}`} className="wv-btn wv-btn-solid" style={{ background: "#e8601c" }}>
             <Mail size={16} /> {profile.email}
           </a>
           <a href={profile.linkedin} target="_blank" rel="noreferrer noopener" className="wv-btn">

@@ -3,26 +3,29 @@ import {
   type Foliage,
   type PropKind,
   type SpriteBox,
+  AUTO_WHEELS,
   BODY_SIZE,
   CAR_BOX,
+  COW_BOX,
   DECOR_BOX,
   FOLIAGE_BOX,
-  GATE_BOX,
   PROP_BOX,
   PROP_DEBRIS,
+  gateBox,
   paintBody,
   paintCampfire,
   paintCar,
+  paintCow,
   paintFoliage,
-  paintFountain,
   paintGate,
   paintPlace,
   paintProp,
   paintSignpost,
+  paintTank,
 } from "./art";
 import { drawDecorOverlay, drawPlaceOverlay, makeOverlaySprites, type OverlaySprites } from "./overlays";
 import { type Ctx, displayFont, mulberry32, setDisplayFamily, text } from "./paint";
-import { BOWLING, DECOR, EDGE, NAME, PONDS, SPAWN, WORLD_H, WORLD_W, districts, places, type Place } from "./places";
+import { DECOR, EDGE, NAME, PITCH, PONDS, SPAWN, WORLD_H, WORLD_W, districts, places, roads, type Place } from "./places";
 import { TILE, buildWorld, queryColliders, renderTile, type WorldData } from "./scenery";
 
 export interface EngineCallbacks {
@@ -72,6 +75,34 @@ interface Particle {
   text?: string;
 }
 
+interface Cow {
+  x: number;
+  y: number;
+  a: number;
+  hx: number;
+  hy: number;
+  tx: number;
+  ty: number;
+  trotUntil: number;
+  lastMoo: number;
+  variant: number;
+}
+
+interface Bunting {
+  ax: number;
+  ay: number;
+  bx: number;
+  by: number;
+}
+
+interface Kite {
+  fx: number;
+  fy: number;
+  color: string;
+  tail: string;
+  phase: number;
+}
+
 interface Flock {
   x: number;
   y: number;
@@ -87,8 +118,10 @@ const TRACK_N = 260;
 const TRACK_LIFE = 7;
 const REBUILD_AFTER = 5;
 const REGROW_AFTER = 6;
-const CONFETTI = ["#e5484d", "#f0a020", "#2f9e62", "#3e8bff", "#ffd34d", "#1f7a8c"];
+const CONFETTI = ["#ff9933", "#ffffff", "#138808", "#ffd54f", "#e8601c", "#1565c0"];
+const FLAGS = ["#ff9933", "#ffffff", "#138808", "#e53935", "#ffd54f", "#1565c0"];
 
+const C_MARIGOLD = "#ffa000";
 const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
 const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
@@ -135,13 +168,17 @@ export class WorldEngine {
   private particles: Particle[] = [];
   private bodies: Body[] = [];
   private flocks: Flock[] = [];
+  private cows: Cow[] = [];
+  private bunting: Bunting[] = [];
+  private kites: Kite[] = [];
+  private touch = false;
+  private howzat = [false, false];
   private treeWob = new Float32Array(0);
   private treeVel = new Float32Array(0);
   private activeTrees = new Set<number>();
   private placeWob = new Float32Array(places.length);
   private placeVel = new Float32Array(places.length);
   private lastBonk = 0;
-  private strike = { firstKnock: 0, done: false };
   private scratch = new Set<number>();
   private drawList: { y: number; k: number; i: number }[] = [];
 
@@ -156,6 +193,7 @@ export class WorldEngine {
     this.reduced = opts.reducedMotion;
     const nav = navigator as Navigator & { deviceMemory?: number };
     if ((nav.hardwareConcurrency ?? 8) <= 4 || (nav.deviceMemory ?? 8) <= 4) this.quality = 1;
+    this.touch = window.matchMedia("(pointer: coarse)").matches;
     this.applyQuality();
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -172,11 +210,11 @@ export class WorldEngine {
   }
 
   private async init() {
-    const fam = getComputedStyle(document.documentElement).getPropertyValue("--font-barlow").trim();
+    const fam = getComputedStyle(document.documentElement).getPropertyValue("--font-rozha").trim();
     setDisplayFamily(fam ? `${fam}, "Arial Narrow", sans-serif` : "\"Arial Narrow\", sans-serif");
     try {
       await Promise.race([
-        Promise.all([600, 700, 800].map((w) => document.fonts.load(displayFont(40, w)))),
+        Promise.all([document.fonts.load(displayFont(40)), document.fonts.load(`400 40px ${fam || "serif"}`, "स्वागत")]),
         new Promise((res) => setTimeout(res, 2500)),
       ]);
     } catch {
@@ -188,6 +226,8 @@ export class WorldEngine {
     this.treeVel = new Float32Array(this.world.standing.length);
     this.spawnBodies();
     this.spawnFlocks();
+    this.spawnCows();
+    this.spawnDecorations();
     this.resize();
     this.ensureTiles(Infinity);
     this.render();
@@ -276,7 +316,7 @@ export class WorldEngine {
   private resize() {
     const w = Math.max(1, this.canvas.clientWidth);
     const h = Math.max(1, this.canvas.clientHeight);
-    const dpr = Math.min(window.devicePixelRatio || 1, [1.5, 1, 0.75][this.quality]);
+    const dpr = Math.min(window.devicePixelRatio || 1, [this.touch ? 1.5 : 2, 1, 0.75][this.quality]);
     this.cssW = w;
     this.cssH = h;
     this.zoom = clamp(Math.min(w, h * 1.4) / 1050, 0.55, 1.05);
@@ -320,7 +360,7 @@ export class WorldEngine {
           made++;
         }
       }
-    const max = this.quality ? 24 : 40;
+    const max = this.quality ? 24 : 32;
     while (this.tiles.size > max) this.tiles.delete(this.tiles.keys().next().value!);
   }
 
@@ -344,7 +384,7 @@ export class WorldEngine {
   }
 
   private propSprite(kind: PropKind, variant: number) {
-    return this.sprite(`p:${kind}:${variant}`, PROP_BOX[kind], (g) => paintProp(g, kind, mulberry32(kind.length * 31 + variant * 7)));
+    return this.sprite(`p:${kind}:${variant}`, PROP_BOX[kind], (g) => paintProp(g, kind));
   }
 
   private placeSprite(p: Place) {
@@ -362,20 +402,64 @@ export class WorldEngine {
 
   private spawnBodies() {
     const add = (kind: BodyKind, x: number, y: number, char = "") => {
-      const r = { crate: 16, pin: 9, ball: 22, brick: 11, letter: 25 }[kind];
-      const m = { crate: 1.3, pin: 0.35, ball: 0.9, brick: 0.7, letter: 1.4 }[kind];
+      const r = { crate: 16, stump: 6, ball: 13, brick: 11, letter: 26 }[kind];
+      const m = { crate: 1.3, stump: 0.3, ball: 0.5, brick: 0.7, letter: 1.4 }[kind];
       this.bodies.push({ kind, char, x, y, vx: 0, vy: 0, a: 0, va: 0, r, m, hx: x, hy: y, ha: 0, order: this.bodies.length, disturbed: -99, lift: 0, rb: null });
     };
     const chars = NAME.text.split("");
     chars.forEach((ch, i) => {
       if (ch !== " ") add("letter", NAME.x + (i - (chars.length - 1) / 2) * NAME.advance, NAME.y, ch);
     });
-    for (let row = 0; row < 4; row++) for (let i = 0; i <= row; i++) add("pin", BOWLING.x + (i - row / 2) * 22, BOWLING.y + row * 22);
+    // Two sets of stumps at either end of the pitch.
+    for (const s of [-1, 1]) for (let k = -1; k <= 1; k++) add("stump", PITCH.x + s * PITCH.half, PITCH.y + k * 11);
     for (let row = 0; row < 2; row++) for (let i = 0; i < 9; i++) add("brick", 1820 + i * 25 + row * 12, 2140 + row * 17);
     for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) add("crate", 1880 + i * 34, 1950 + j * 34);
     for (const [x, y] of [[2560, 1440], [2594, 1452], [960, 1460], [1300, 700], [2140, 860]]) add("crate", x, y);
-    add("ball", 1700, 2100);
+    add("ball", PITCH.x - 60, PITCH.y);
     add("ball", 1890, 1460);
+  }
+
+  private spawnCows() {
+    const homes: [number, number][] = [[1500, 1520], [2150, 1180], [1180, 1050], [2400, 1900]];
+    homes.forEach(([x, y], i) => this.cows.push({ x, y, a: i, hx: x, hy: y, tx: x, ty: y, trotUntil: 0, lastMoo: -9, variant: i }));
+  }
+
+  private spawnDecorations() {
+    // Festival bunting strung across the roads, and kites in the sky.
+    for (const rd of roads) {
+      for (const t of [0.3, 0.7]) {
+        const u = 1 - t;
+        const pt = (k: number) => u * u * u * rd[0][k] + 3 * u * u * t * rd[1][k] + 3 * u * t * t * rd[2][k] + t * t * t * rd[3][k];
+        const dt = 0.01;
+        const u2 = 1 - (t + dt);
+        const t2 = t + dt;
+        const pt2 = (k: number) => u2 * u2 * u2 * rd[0][k] + 3 * u2 * u2 * t2 * rd[1][k] + 3 * u2 * t2 * t2 * rd[2][k] + t2 * t2 * t2 * rd[3][k];
+        const x = pt(0);
+        const y = pt(1);
+        const len = Math.hypot(pt2(0) - x, pt2(1) - y) || 1;
+        const nx = -(pt2(1) - y) / len;
+        const ny = (pt2(0) - x) / len;
+        this.bunting.push({ ax: x + nx * 72, ay: y + ny * 72, bx: x - nx * 72, by: y - ny * 72 });
+      }
+    }
+    const kc: [string, string][] = [["#ff9933", "#138808"], ["#1565c0", "#ffd54f"], ["#e53935", "#ffffff"], ["#138808", "#ff9933"]];
+    kc.forEach(([color, tail], i) => this.kites.push({ fx: 0.15 + i * 0.24, fy: 0.12 + (i % 2) * 0.1, color, tail, phase: i * 1.7 }));
+  }
+
+  private honk() {
+    this.say("POM POM!", this.car.x, this.car.y - 56, "#e8601c", 32);
+    for (const c of this.cows) {
+      if (Math.hypot(c.x - this.car.x, c.y - this.car.y) < 280) {
+        c.trotUntil = this.t + 2;
+        const a = Math.atan2(c.y - this.car.y, c.x - this.car.x);
+        c.tx = c.x + Math.cos(a) * 160;
+        c.ty = c.y + Math.sin(a) * 160;
+        if (this.t - c.lastMoo > 1.5) {
+          c.lastMoo = this.t;
+          this.say("moo!", c.x, c.y - 40, "#5d4037", 24);
+        }
+      }
+    }
   }
 
   private spawnFlocks() {
@@ -404,7 +488,7 @@ export class WorldEngine {
   }
 
   private leaves(x: number, y: number, n: number, autumn: boolean) {
-    const cols = autumn ? ["#c4561f", "#e8892f", "#9c3d18"] : ["#7fb35a", "#527f43", "#a7c977"];
+    const cols = autumn ? [C_MARIGOLD, "#ffd54f", "#ff6f00"] : ["#5cbf45", "#2f8a36", "#a8e070"];
     for (let i = 0; i < n; i++) {
       this.spawn({
         kind: "leaf",
@@ -473,6 +557,7 @@ export class WorldEngine {
     if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
     if (!WorldEngine.DRIVE_KEYS.has(k)) {
       if (k === "r") this.resetCar();
+      else if (k === "h") this.honk();
       return;
     }
     if (k === " " && target?.closest("button, a")) return;
@@ -658,6 +743,7 @@ export class WorldEngine {
 
     this.updateSprings(dt);
     this.updateBodies(dt);
+    this.updateCows(dt);
     this.updateProps();
     this.updateParticles(dt);
     this.updateAmbient(dt);
@@ -742,7 +828,7 @@ export class WorldEngine {
         if (c.ref.type === "tree") {
           this.kickTree(c.ref.i, -vn / 260);
           const s = this.world.standing[c.ref.i];
-          if (-vn > 90) this.leaves(s.x, s.y, this.quality ? 3 : 7, s.kind === "maple");
+          if (-vn > 90) this.leaves(s.x, s.y - (s.kind === "palm" ? 120 : 40), this.quality ? 3 : 7, false);
         } else if (c.ref.type === "place") {
           this.placeVel[c.ref.i] += -vn / 180;
         }
@@ -757,7 +843,7 @@ export class WorldEngine {
     this.debris(p.x, p.y - 12, PROP_DEBRIS[p.kind], this.quality ? 5 : 10, vx, vy);
     if (this.t - this.lastBonk > 0.8) {
       this.lastBonk = this.t;
-      this.say(["crash!", "oops", "smash!", "kaboom"][Math.floor(Math.random() * 4)], p.x, p.y - 50);
+      this.say(["dhishoom!", "crash!", "aiyo!", "smash!"][Math.floor(Math.random() * 4)], p.x, p.y - 50);
     }
     if (!this.reduced) this.shake = Math.max(this.shake, 4);
   }
@@ -767,7 +853,7 @@ export class WorldEngine {
     if (!this.reduced) this.shake = Math.min(10, impact / 50);
     if (this.t - this.lastBonk > 0.6) {
       this.lastBonk = this.t;
-      this.say(["bam!", "oof", "thud", "whoa", "crunch"][Math.floor(Math.random() * 5)], this.car.x, this.car.y - 50);
+      this.say(["arre!", "aiyo!", "oof", "thud", "bam!"][Math.floor(Math.random() * 5)], this.car.x, this.car.y - 50);
     }
   }
 
@@ -798,11 +884,11 @@ export class WorldEngine {
           b.rb = null;
           b.lift = 0;
           b.vx = b.vy = b.va = 0;
-          if (b.kind !== "pin" && b.kind !== "brick") this.sparkles(b.x, b.y, 2);
+          if (b.kind !== "stump" && b.kind !== "brick") this.sparkles(b.x, b.y, 2);
         }
         continue;
       }
-      const friction = b.kind === "ball" ? 0.7 : b.kind === "pin" ? 1.8 : 2.6;
+      const friction = b.kind === "ball" ? 0.7 : b.kind === "stump" ? 1.8 : 2.6;
       b.vx *= Math.exp(-dt * friction);
       b.vy *= Math.exp(-dt * friction);
       b.va *= Math.exp(-dt * 2.5);
@@ -914,18 +1000,79 @@ export class WorldEngine {
       b.vx = b.vy = b.va = 0;
     }
 
-    // Bowling.
-    let knocked = 0;
-    for (const b of bodies) if (b.kind === "pin" && Math.hypot(b.x - b.hx, b.y - b.hy) > 18) knocked++;
-    if (knocked === 0) this.strike = { firstKnock: 0, done: false };
-    else if (!this.strike.firstKnock) this.strike.firstKnock = this.t;
-    if (!this.strike.done && knocked >= 9 && this.t - this.strike.firstKnock < 4) {
-      this.strike.done = true;
-      this.say("STRIKE!", BOWLING.x, BOWLING.y - 60, "#d9622b", 64);
-      for (let i = 0; i < (this.quality ? 14 : 36); i++) {
-        const a = Math.random() * Math.PI * 2;
-        const s = 120 + Math.random() * 260;
-        this.spawn({ kind: "confetti", x: BOWLING.x, y: BOWLING.y, z: 20, vx: Math.cos(a) * s, vy: Math.sin(a) * s * 0.6, vz: 200 + Math.random() * 200, max: 1.6 + Math.random() * 0.6, size: 5 + Math.random() * 4, color: CONFETTI[i % CONFETTI.length], rot: Math.random() * 6, vr: (Math.random() - 0.5) * 12 });
+    // Cricket: knock all three stumps at an end for a HOWZAT.
+    for (let end = 0; end < 2; end++) {
+      const set = bodies.filter((b) => b.kind === "stump" && (b.hx < PITCH.x) === (end === 0));
+      const down = set.filter((b) => Math.abs(wrapAngle(b.a)) > 0.5 || Math.hypot(b.x - b.hx, b.y - b.hy) > 12).length;
+      if (down === 0) this.howzat[end] = false;
+      else if (down === set.length && !this.howzat[end]) {
+        this.howzat[end] = true;
+        const hx = set[0].hx;
+        this.say("HOWZAT!", hx, PITCH.y - 70, "#e8601c", 60);
+        for (let i = 0; i < (this.quality ? 14 : 36); i++) {
+          const a = Math.random() * Math.PI * 2;
+          const sp = 120 + Math.random() * 260;
+          this.spawn({ kind: "confetti", x: hx, y: PITCH.y, z: 20, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.6, vz: 200 + Math.random() * 200, max: 1.6 + Math.random() * 0.6, size: 5 + Math.random() * 4, color: CONFETTI[i % CONFETTI.length], rot: Math.random() * 6, vr: (Math.random() - 0.5) * 12 });
+        }
+      }
+    }
+  }
+
+  private updateCows(dt: number) {
+    if (!this.world) return;
+    const car = this.car;
+    for (const c of this.cows) {
+      if (Math.hypot(c.tx - c.x, c.ty - c.y) < 10 && this.t > c.trotUntil && Math.random() < 0.01) {
+        c.tx = c.hx + (Math.random() - 0.5) * 360;
+        c.ty = c.hy + (Math.random() - 0.5) * 240;
+      }
+      const d = Math.hypot(c.tx - c.x, c.ty - c.y);
+      if (d > 6) {
+        const want = Math.atan2(c.ty - c.y, c.tx - c.x);
+        c.a += wrapAngle(want - c.a) * Math.min(1, dt * 2);
+        const sp = this.t < c.trotUntil ? 95 : 22;
+        c.x += Math.cos(c.a) * sp * dt;
+        c.y += Math.sin(c.a) * sp * dt;
+      }
+      c.x = clamp(c.x, EDGE + 40, WORLD_W - EDGE - 40);
+      c.y = clamp(c.y, EDGE + 40, WORLD_H - EDGE - 40);
+      for (const ci of queryColliders(this.world, c.x, c.y, this.scratch)) {
+        const k = this.world.colliders[ci];
+        const dx = c.x - k.x;
+        const dy = c.y - k.y;
+        const min = 24 + k.r;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < min * min) {
+          const dd = Math.sqrt(d2) || 1;
+          c.x += (dx / dd) * (min - dd);
+          c.y += (dy / dd) * (min - dd);
+          c.tx = c.hx;
+          c.ty = c.hy;
+        }
+      }
+      // The auto bounces off a cow; the cow is unimpressed.
+      const dx = car.x - c.x;
+      const dy = car.y - c.y;
+      const min = CAR_R + 26;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < min * min) {
+        const dd = Math.sqrt(d2) || 1;
+        const nx = dx / dd;
+        const ny = dy / dd;
+        car.x += nx * (min - dd);
+        car.y += ny * (min - dd);
+        const vn = car.vx * nx + car.vy * ny;
+        if (vn < 0) {
+          car.vx -= 1.4 * vn * nx;
+          car.vy -= 1.4 * vn * ny;
+        }
+        if (this.t - c.lastMoo > 1.2) {
+          c.lastMoo = this.t;
+          this.say("MOO!", c.x, c.y - 44, "#5d4037", 34);
+          c.trotUntil = this.t + 1.6;
+          c.tx = c.x - nx * 180;
+          c.ty = c.y - ny * 180;
+        }
       }
     }
   }
@@ -975,16 +1122,7 @@ export class WorldEngine {
   }
 
   private updateAmbient(dt: number) {
-    if (this.quality > 0 || this.reduced || !this.world) return;
-    // Autumn leaves drift from maples near the camera.
-    const { left, top, vw, vh } = this.view();
-    if (Math.random() < 0.12) {
-      const st = this.world.standing;
-      const s = st[Math.floor(Math.random() * st.length)];
-      if (s.kind === "maple" && s.x > left - 100 && s.x < left + vw + 100 && s.y > top - 100 && s.y < top + vh + 200) {
-        this.leaves(s.x, s.y, 1, true);
-      }
-    }
+    if (this.quality > 0 || this.reduced) return;
     for (const f of this.flocks) {
       f.x += f.vx * dt;
       f.y += f.vy * dt;
@@ -1032,7 +1170,7 @@ export class WorldEngine {
     const ox = Math.round(-(left + shakeX) * S);
     const oy = Math.round(-(top + shakeY) * S);
 
-    ctx.fillStyle = "#76a35a";
+    ctx.fillStyle = "#5fae47";
     for (let tx = Math.floor(left / TILE); tx <= Math.floor((left + vw) / TILE); tx++)
       for (let ty = Math.floor(top / TILE); ty <= Math.floor((top + vh) / TILE); ty++) {
         const tile = this.tiles.get(`${tx},${ty}`);
@@ -1069,7 +1207,7 @@ export class WorldEngine {
     }
     for (let i = 0; i < districts.length; i++) {
       const g = districts[i].gate;
-      if (inView(g.x - 180, g.y - 220, g.x + 180, g.y + 40)) list.push({ y: g.y, k: 3, i });
+      if (inView(g.x - 200, g.y - 460, g.x + 200, g.y + 40)) list.push({ y: g.y, k: 3, i });
     }
     for (let i = 0; i < DECOR.length; i++) {
       const d = DECOR[i];
@@ -1078,6 +1216,10 @@ export class WorldEngine {
     for (let i = 0; i < this.bodies.length; i++) {
       const b = this.bodies[i];
       if (inView(b.x - 50, b.y - 90, b.x + 50, b.y + 50)) list.push({ y: b.y, k: 5, i });
+    }
+    for (let i = 0; i < this.cows.length; i++) {
+      const c = this.cows[i];
+      if (inView(c.x - 60, c.y - 60, c.x + 60, c.y + 60)) list.push({ y: c.y, k: 7, i });
     }
     list.push({ y: this.car.y + 6, k: 6, i: 0 });
     list.sort((a, b) => a.y - b.y);
@@ -1116,7 +1258,8 @@ export class WorldEngine {
         case 3: {
           const dist = districts[d.i];
           ctx.setTransform(S, 0, 0, S, ox + S * dist.gate.x, oy + S * dist.gate.y);
-          ctx.drawImage(this.sprite(`g:${dist.id}`, GATE_BOX, (g) => paintGate(g, dist)), -GATE_BOX.ax, -GATE_BOX.ay, GATE_BOX.w, GATE_BOX.h);
+          const gb = gateBox(dist);
+          ctx.drawImage(this.sprite(`g:${dist.id}`, gb, (g) => paintGate(g, dist)), -gb.ax, -gb.ay, gb.w, gb.h);
           break;
         }
         case 4: {
@@ -1124,7 +1267,7 @@ export class WorldEngine {
           const box = DECOR_BOX[dc.kind];
           ctx.setTransform(S, 0, 0, S, ox + S * dc.x, oy + S * dc.y);
           const spr = this.sprite(`d:${dc.kind}`, box, (g) =>
-            dc.kind === "fountain" ? paintFountain(g) : dc.kind === "campfire" ? paintCampfire(g, mulberry32(4)) : paintSignpost(g, districts),
+            dc.kind === "tank" ? paintTank(g, mulberry32(8)) : dc.kind === "campfire" ? paintCampfire(g, mulberry32(4)) : paintSignpost(g, districts),
           );
           ctx.drawImage(spr, -box.ax, -box.ay, box.w, box.h);
           ctx.setTransform(S, 0, 0, S, ox, oy);
@@ -1149,13 +1292,132 @@ export class WorldEngine {
         case 6:
           this.drawCar(ox, oy);
           break;
+        case 7: {
+          const c = this.cows[d.i];
+          ctx.setTransform(S, 0, 0, S, ox, oy);
+          ctx.fillStyle = "rgba(16, 36, 60, 0.25)";
+          ctx.beginPath();
+          ctx.ellipse(c.x + 6, c.y + 10, 34, 16, c.a, 0, Math.PI * 2);
+          ctx.fill();
+          const bob = Math.sin(this.t * (this.t < c.trotUntil ? 14 : 5) + c.variant) * 1.2;
+          const cos = Math.cos(c.a) * S;
+          const sin = Math.sin(c.a) * S;
+          ctx.setTransform(cos, sin, -sin, cos, ox + S * c.x, oy + S * (c.y + bob));
+          ctx.drawImage(this.sprite(`cow:${c.variant % 2}`, COW_BOX, (g) => paintCow(g, mulberry32(90 + (c.variant % 2)))), -COW_BOX.ax, -COW_BOX.ay, COW_BOX.w, COW_BOX.h);
+          break;
+        }
       }
     }
 
     ctx.setTransform(S, 0, 0, S, ox, oy);
+    this.drawBunting(left, top, vw, vh);
     this.drawFlocks(left, top, vw, vh);
     this.drawParticles();
-    if (!this.quality && !this.reduced) this.drawCloudShadows(left, top, vw, vh);
+    if (!this.quality && !this.reduced) {
+      this.drawCloudShadows(left, top, vw, vh);
+      this.drawKites();
+    }
+  }
+
+  private drawBunting(left: number, top: number, vw: number, vh: number) {
+    const ctx = this.ctx;
+    const lift = 74;
+    for (let s = 0; s < this.bunting.length; s++) {
+      const b = this.bunting[s];
+      if (Math.max(b.ax, b.bx) < left || Math.min(b.ax, b.bx) > left + vw || Math.max(b.ay, b.by) < top || Math.min(b.ay, b.by) - lift > top + vh) continue;
+      for (const [px, py] of [[b.ax, b.ay], [b.bx, b.by]]) {
+        ctx.fillStyle = "#8a6a3a";
+        ctx.fillRect(px - 2, py - lift - 4, 4, lift + 4);
+      }
+      const sway = this.reduced ? 0 : Math.sin(this.t * 1.6 + s) * 4;
+      const n = 12;
+      ctx.strokeStyle = "#5a4020";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      for (let i = 0; i <= n; i++) {
+        const u = i / n;
+        const x = b.ax + (b.bx - b.ax) * u;
+        const y = b.ay + (b.by - b.ay) * u - lift + Math.sin(Math.PI * u) * (22 + sway);
+        if (i) ctx.lineTo(x, y);
+        else ctx.moveTo(x, y);
+      }
+      ctx.stroke();
+      for (let i = 1; i < n; i++) {
+        const u = i / n;
+        const x = b.ax + (b.bx - b.ax) * u;
+        const y = b.ay + (b.by - b.ay) * u - lift + Math.sin(Math.PI * u) * (22 + sway);
+        const flutter = this.reduced ? 0 : Math.sin(this.t * 6 + i + s) * 2;
+        ctx.fillStyle = FLAGS[(i + s) % FLAGS.length];
+        ctx.beginPath();
+        ctx.moveTo(x - 6, y);
+        ctx.lineTo(x + 6, y);
+        ctx.lineTo(x + flutter, y + 15);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+  }
+
+  private drawKites() {
+    // Kites live in screen space with a little parallax against the camera.
+    const ctx = this.ctx;
+    const dpr = this.canvas.width / this.cssW;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const W = this.cssW;
+    const H = this.cssH;
+    for (const k of this.kites) {
+      const span = W + 240;
+      const x = ((((k.fx * W - this.cam.x * 0.12 + Math.sin(this.t * 0.2 + k.phase) * 40) % span) + span) % span) - 120;
+      const y = k.fy * H + Math.sin(this.t * 0.7 + k.phase) * 12 - ((this.cam.y * 0.04) % 40);
+      const rot = Math.sin(this.t * 1.1 + k.phase) * 0.25;
+      ctx.strokeStyle = "rgba(255,255,255,0.55)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, y + 22);
+      ctx.quadraticCurveTo(x - 60, y + H * 0.4, x - 140, H + 20);
+      ctx.stroke();
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rot);
+      ctx.fillStyle = "rgba(0,0,0,0.15)";
+      ctx.beginPath();
+      ctx.moveTo(4, -18);
+      ctx.lineTo(22, 4);
+      ctx.lineTo(4, 26);
+      ctx.lineTo(-14, 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = k.color;
+      ctx.beginPath();
+      ctx.moveTo(0, -22);
+      ctx.lineTo(18, 0);
+      ctx.lineTo(0, 22);
+      ctx.lineTo(-18, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      ctx.beginPath();
+      ctx.moveTo(0, -22);
+      ctx.lineTo(-18, 0);
+      ctx.lineTo(0, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "rgba(60,40,20,0.6)";
+      ctx.beginPath();
+      ctx.moveTo(0, -22);
+      ctx.lineTo(0, 22);
+      ctx.moveTo(-18, 0);
+      ctx.lineTo(18, 0);
+      ctx.stroke();
+      ctx.fillStyle = k.tail;
+      ctx.beginPath();
+      ctx.moveTo(0, 22);
+      ctx.lineTo(-6, 34 + Math.sin(this.t * 5 + k.phase) * 3);
+      ctx.lineTo(6, 34 - Math.sin(this.t * 5 + k.phase) * 3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
   }
 
   private drawWaterGlints(t: number, left: number, top: number, vw: number, vh: number) {
@@ -1218,7 +1480,7 @@ export class WorldEngine {
     ctx.fill();
     ctx.rotate(a);
     ctx.fillStyle = "#2f2f35";
-    for (const [wx, wy, front] of [[18, -17, 1], [18, 17, 1], [-17, -17, 0], [-17, 17, 0]] as const) {
+    for (const [wx, wy, front] of AUTO_WHEELS) {
       ctx.save();
       ctx.translate(wx, wy);
       if (front) ctx.rotate(steer * 0.45);

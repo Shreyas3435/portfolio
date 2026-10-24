@@ -213,27 +213,31 @@ export function drawPlaceOverlay(ctx: Ctx, p: Place, t: number, s: OverlaySprite
 }
 
 export function drawDecorOverlay(ctx: Ctx, kind: DecorKind, x: number, y: number, t: number) {
-  if (kind === "fountain") {
-    // Arcing jets from the top bowl.
-    ctx.strokeStyle = "rgba(220, 245, 255, 0.85)";
-    ctx.lineWidth = 2.5;
-    for (let k = 0; k < 6; k++) {
-      const a = (k / 6) * Math.PI * 2 + t * 0.3;
-      const dx = Math.cos(a) * 58;
-      const dy = Math.sin(a) * 22;
-      ctx.beginPath();
-      ctx.moveTo(x, y - 74);
-      ctx.quadraticCurveTo(x + dx * 0.5, y - 104, x + dx, y - 6 + dy);
-      ctx.stroke();
-    }
+  if (kind === "tank") {
+    // Ripples and glints on the temple tank.
     for (let k = 0; k < 3; k++) {
-      const ph = (t * 0.6 + k / 3) % 1;
-      ctx.strokeStyle = `rgba(255,255,255,${(1 - ph) * 0.6})`;
+      const ph = (t * 0.5 + k / 3) % 1;
+      ctx.strokeStyle = `rgba(255,255,255,${(1 - ph) * 0.7})`;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.ellipse(x, y - 4, 20 + ph * 50, (20 + ph * 50) * 0.38, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + (k - 1) * 14, y + (k % 2) * 6, 6 + ph * 22, (6 + ph * 22) * 0.45, 0, 0, Math.PI * 2);
       ctx.stroke();
     }
+    ctx.fillStyle = "#ffffff";
+    for (let k = 0; k < 4; k++) {
+      const a = Math.max(0, Math.sin(t * 2.4 + k * 1.9));
+      ctx.globalAlpha = a;
+      const gx = x - 30 + k * 20;
+      const gy = y - 10 + (k % 2) * 16;
+      ctx.beginPath();
+      ctx.moveTo(gx - 6, gy);
+      ctx.lineTo(gx, gy - 1.5);
+      ctx.lineTo(gx + 6, gy);
+      ctx.lineTo(gx, gy + 1.5);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
   } else if (kind === "campfire") {
     const flick = (k: number) => 0.85 + Math.sin(t * 11 + k * 1.7) * 0.1 + Math.sin(t * 17 + k) * 0.06;
     glow(ctx, x, y - 20, 90, "#ffb347", 0.3 + Math.sin(t * 9) * 0.04);
