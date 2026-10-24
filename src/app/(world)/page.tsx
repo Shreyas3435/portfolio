@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { profile } from "@/data/profile";
 import { flagshipProjects } from "@/data/projects";
-import { SketchWorld } from "@/components/world/sketch-world";
+import { PortfolioWorld } from "@/components/world/portfolio-world";
 
 export default function Home() {
   return (
@@ -9,7 +9,7 @@ export default function Home() {
       <h1 className="sr-only">
         {profile.name} — {profile.role}
       </h1>
-      <SketchWorld />
+      <PortfolioWorld />
       {/* The same content as plain links, for screen readers, crawlers and no-JS visitors. */}
       <nav className="sr-only" aria-label="Projects and contact">
         <p>{profile.heroLine}</p>

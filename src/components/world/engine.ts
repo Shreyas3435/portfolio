@@ -1,24 +1,29 @@
-import { drawLandmark, drawOverlay, makeOverlaySprites, type OverlaySprites } from "./landmarks";
-import { BOWLING, PONDS, SPAWN, WORLD_H, WORLD_W, places, type Place } from "./places";
-import { FENCE, TILE, buildWorld, queryColliders, renderTile, type WorldData } from "./scenery";
 import {
-  type Ctx,
-  INK,
-  INK_SOFT,
-  PAPER,
-  edge,
-  ellipsePts,
-  fillPaper,
-  handFont,
-  handText,
-  makeGrain,
-  mulberry32,
-  rectPts,
-  scribble,
-  setHandFamily,
-  sketchPoly,
-  wash,
-} from "./sketch";
+  type BodyKind,
+  type Foliage,
+  type PropKind,
+  type SpriteBox,
+  BODY_SIZE,
+  CAR_BOX,
+  DECOR_BOX,
+  FOLIAGE_BOX,
+  GATE_BOX,
+  PROP_BOX,
+  PROP_DEBRIS,
+  paintBody,
+  paintCampfire,
+  paintCar,
+  paintFoliage,
+  paintFountain,
+  paintGate,
+  paintPlace,
+  paintProp,
+  paintSignpost,
+} from "./art";
+import { drawDecorOverlay, drawPlaceOverlay, makeOverlaySprites, type OverlaySprites } from "./overlays";
+import { type Ctx, displayFont, mulberry32, setDisplayFamily, text } from "./paint";
+import { BOWLING, DECOR, EDGE, NAME, PONDS, SPAWN, WORLD_H, WORLD_W, districts, places, type Place } from "./places";
+import { TILE, buildWorld, queryColliders, renderTile, type WorldData } from "./scenery";
 
 export interface EngineCallbacks {
   onNear: (id: string | null) => void;
@@ -27,10 +32,9 @@ export interface EngineCallbacks {
   onMoved: () => void;
 }
 
-type BodyKind = "crate" | "pin" | "ball";
-
 interface Body {
   kind: BodyKind;
+  char: string;
   x: number;
   y: number;
   vx: number;
@@ -41,16 +45,24 @@ interface Body {
   m: number;
   hx: number;
   hy: number;
+  ha: number;
+  order: number;
+  disturbed: number;
+  lift: number;
+  /** Set while the body is gliding back to its home spot. */
+  rb: { t0: number; delay: number; fx: number; fy: number; fa: number } | null;
 }
 
-type ParticleKind = "dust" | "leaf" | "confetti" | "text" | "ripple";
+type ParticleKind = "dust" | "leaf" | "debris" | "sparkle" | "text" | "confetti" | "ripple";
 
 interface Particle {
   kind: ParticleKind;
   x: number;
   y: number;
+  z: number;
   vx: number;
   vy: number;
+  vz: number;
   life: number;
   max: number;
   size: number;
@@ -60,18 +72,30 @@ interface Particle {
   text?: string;
 }
 
+interface Butterfly {
+  x: number;
+  y: number;
+  tx: number;
+  ty: number;
+  color: string;
+  phase: number;
+}
+
 const CAR_R = 22;
 const CAR_M = 4;
-const MAX_SPEED = 560;
+const MAX_SPEED = 580;
 const TRACK_N = 260;
 const TRACK_LIFE = 7;
-const CAR_COLOR = "#ff6b4a";
-const CONFETTI = ["#e5484d", "#f5a524", "#30a46c", "#3e8bff", "#d6409f", "#7c4dff"];
+const REBUILD_AFTER = 5;
+const REGROW_AFTER = 6;
+const CONFETTI = ["#e5484d", "#f0a020", "#2f9e62", "#3e8bff", "#d6409f", "#8c5bd6"];
 
 const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
 const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+const easeOutBack = (t: number) => 1 + 2.7 * (t - 1) ** 3 + 1.7 * (t - 1) ** 2;
 
-export class SketchEngine {
+export class WorldEngine {
   private ctx: Ctx;
   private world: WorldData | null = null;
   private raf = 0;
@@ -79,31 +103,25 @@ export class SketchEngine {
   private t = 0;
   private alive = true;
   private ready = false;
+  private paused = false;
 
   private cssW = 1;
   private cssH = 1;
-  private dpr = 1;
   private zoom = 1;
   private S = 1;
-  private low: boolean;
-  /** 0 = full, 1 = low (dpr 1, no boil), 2 = potato (render below native resolution). */
+  /** 0 = full, 1 = low (dpr 1, fewer effects), 2 = potato (below native resolution). */
   private quality = 0;
   private reduced: boolean;
-  private variants: number;
-  private maxParticles: number;
+  private maxParticles = 140;
   private frameSamples = 0;
   private frameTotal = 0;
 
   private tiles = new Map<string, HTMLCanvasElement>();
-  private sprites = new Map<string, HTMLCanvasElement[]>();
-  private carSprites: HTMLCanvasElement[] = [];
-  private bodySprites = new Map<BodyKind, HTMLCanvasElement>();
+  private sprites = new Map<string, HTMLCanvasElement>();
   private overlay: OverlaySprites | null = null;
-  private grainCanvas: HTMLCanvasElement | null = null;
-  private grain: CanvasPattern | null = null;
 
   car = { x: SPAWN.x, y: SPAWN.y, a: SPAWN.angle, vx: 0, vy: 0, steer: 0 };
-  private cam = { x: SPAWN.x, y: SPAWN.y - 120 };
+  private cam = { x: SPAWN.x, y: SPAWN.y - 140 };
   private shake = 0;
   private keys = new Set<string>();
   private pointer = { active: false, id: -1, x: 0, y: 0, downT: 0, downX: 0, downY: 0, moved: false };
@@ -117,9 +135,16 @@ export class SketchEngine {
   private lastTrack = { x: SPAWN.x, y: SPAWN.y };
   private particles: Particle[] = [];
   private bodies: Body[] = [];
+  private butterflies: Butterfly[] = [];
+  private treeWob = new Float32Array(0);
+  private treeVel = new Float32Array(0);
+  private activeTrees = new Set<number>();
+  private placeWob = new Float32Array(places.length);
+  private placeVel = new Float32Array(places.length);
   private lastBonk = 0;
   private strike = { firstKnock: 0, done: false };
-  private colliderScratch = new Set<number>();
+  private scratch = new Set<number>();
+  private drawList: { y: number; k: number; i: number }[] = [];
 
   private resizeObserver: ResizeObserver;
 
@@ -131,10 +156,8 @@ export class SketchEngine {
     this.ctx = canvas.getContext("2d", { alpha: false })!;
     this.reduced = opts.reducedMotion;
     const nav = navigator as Navigator & { deviceMemory?: number };
-    this.low = (nav.hardwareConcurrency ?? 8) <= 4 || (nav.deviceMemory ?? 8) <= 4;
-    if (this.low) this.quality = 1;
-    this.variants = this.reduced || this.low ? 1 : 2;
-    this.maxParticles = this.low ? 50 : 120;
+    if ((nav.hardwareConcurrency ?? 8) <= 4 || (nav.deviceMemory ?? 8) <= 4) this.quality = 1;
+    this.applyQuality();
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(canvas);
@@ -150,11 +173,11 @@ export class SketchEngine {
   }
 
   private async init() {
-    const fam = getComputedStyle(document.documentElement).getPropertyValue("--font-caveat").trim();
-    setHandFamily(fam ? `${fam}, cursive` : "cursive");
+    const fam = getComputedStyle(document.documentElement).getPropertyValue("--font-fraunces").trim();
+    setDisplayFamily(fam ? `${fam}, Georgia, serif` : "Georgia, serif");
     try {
       await Promise.race([
-        Promise.all([document.fonts.load(handFont(40, 700)), document.fonts.load(handFont(40, 500)), document.fonts.load(handFont(40, 600))]),
+        Promise.all([...[600, 700, 900].map((w) => document.fonts.load(displayFont(40, w))), document.fonts.load(displayFont(30, 600, true))]),
         new Promise((res) => setTimeout(res, 2500)),
       ]);
     } catch {
@@ -162,20 +185,32 @@ export class SketchEngine {
     }
     if (!this.alive) return;
     this.world = buildWorld();
+    this.treeWob = new Float32Array(this.world.standing.length);
+    this.treeVel = new Float32Array(this.world.standing.length);
     this.spawnBodies();
+    this.spawnButterflies();
     this.resize();
-    // Draw everything that's on screen before revealing the world.
     this.ensureTiles(Infinity);
     this.render();
     this.ready = true;
     this.cb.onReady();
+    this.start();
+  }
+
+  private start() {
+    if (this.raf || this.paused || document.hidden || !this.ready) return;
     this.last = performance.now();
     this.raf = requestAnimationFrame(this.frame);
   }
 
+  private stop() {
+    cancelAnimationFrame(this.raf);
+    this.raf = 0;
+  }
+
   destroy() {
     this.alive = false;
-    cancelAnimationFrame(this.raf);
+    this.stop();
     this.resizeObserver.disconnect();
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("keyup", this.onKeyUp);
@@ -201,68 +236,66 @@ export class SketchEngine {
     }
   }
 
+  /** Stop the loop entirely, e.g. while the page view covers the world. */
+  setPaused(paused: boolean) {
+    this.paused = paused;
+    if (paused) this.stop();
+    else this.start();
+  }
+
   travelTo(id: string) {
     const p = places.find((pl) => pl.id === id);
     if (!p) return;
-    this.puff(this.car.x, this.car.y, 10);
+    this.sparkles(this.car.x, this.car.y, 8);
     this.car.x = p.front[0];
-    this.car.y = p.front[1] + (p.kind === "social" ? 30 : 10);
+    this.car.y = p.front[1] + 30;
     this.car.a = -Math.PI / 2;
     this.car.vx = this.car.vy = 0;
     this.breakTracks();
-    this.puff(this.car.x, this.car.y, 14);
-    if (this.reduced) this.cam = { x: this.car.x, y: this.car.y - 120 };
+    this.sparkles(this.car.x, this.car.y, 12);
+    if (this.reduced) this.cam = { x: this.car.x, y: this.car.y - 140 };
   }
 
   resetCar() {
-    this.puff(this.car.x, this.car.y, 10);
+    this.sparkles(this.car.x, this.car.y, 8);
     this.car = { x: SPAWN.x, y: SPAWN.y, a: SPAWN.angle, vx: 0, vy: 0, steer: 0 };
     this.breakTracks();
   }
 
-  /** Car position as a 0..1 fraction of the world, for the map overlay. */
   carOnMap() {
     return { x: this.car.x / WORLD_W, y: this.car.y / WORLD_H, a: this.car.a };
   }
 
   // -------------------------------------------------------------------------
-  // Sizing & caches
+  // Sizing, quality & caches
   // -------------------------------------------------------------------------
+
+  private applyQuality() {
+    this.maxParticles = this.quality ? 60 : 140;
+  }
 
   private resize() {
     const w = Math.max(1, this.canvas.clientWidth);
     const h = Math.max(1, this.canvas.clientHeight);
     const dpr = Math.min(window.devicePixelRatio || 1, [1.5, 1, 0.75][this.quality]);
-    const zoom = clamp(Math.min(w, h * 1.4) / 1100, 0.55, 1);
     this.cssW = w;
     this.cssH = h;
-    this.dpr = dpr;
-    this.zoom = zoom;
+    this.zoom = clamp(Math.min(w, h * 1.4) / 1050, 0.55, 1.05);
     this.canvas.width = Math.round(w * dpr);
     this.canvas.height = Math.round(h * dpr);
-    const S = zoom * dpr;
+    const S = this.zoom * dpr;
     if (Math.abs(S - this.S) > 0.01 || !this.overlay) {
       this.S = S;
-      this.flushCaches();
+      this.tiles.clear();
+      this.sprites.clear();
+      this.overlay = makeOverlaySprites(S);
     }
     if (this.ready && !this.raf) this.render();
   }
 
-  private flushCaches() {
-    this.tiles.clear();
-    this.sprites.clear();
-    this.bodySprites.clear();
-    this.carSprites = [];
-    this.overlay = makeOverlaySprites(this.S, mulberry32(3));
-    if (!this.grainCanvas) this.grainCanvas = makeGrain();
-    this.grain = this.ctx.createPattern(this.grainCanvas, "repeat");
-  }
-
-  private stepDownQuality() {
-    this.quality++;
-    this.low = true;
-    this.variants = 1;
-    this.maxParticles = 50;
+  private stepDownQuality(steps: number) {
+    this.quality = Math.min(2, this.quality + steps);
+    this.applyQuality();
     this.resize();
   }
 
@@ -275,124 +308,53 @@ export class SketchEngine {
   private ensureTiles(budget: number) {
     if (!this.world) return;
     const { left, top, vw, vh } = this.view();
-    const maxTiles = this.low ? 24 : 40;
     let made = 0;
-    const want: [number, number][] = [];
     for (let tx = Math.floor((left - 64) / TILE); tx <= Math.floor((left + vw + 64) / TILE); tx++)
-      for (let ty = Math.floor((top - 64) / TILE); ty <= Math.floor((top + vh + 64) / TILE); ty++) want.push([tx, ty]);
-    for (const [tx, ty] of want) {
-      const k = `${tx},${ty}`;
-      const tile = this.tiles.get(k);
-      if (tile) {
-        this.tiles.delete(k);
-        this.tiles.set(k, tile);
-        continue;
+      for (let ty = Math.floor((top - 64) / TILE); ty <= Math.floor((top + vh + 64) / TILE); ty++) {
+        const k = `${tx},${ty}`;
+        const tile = this.tiles.get(k);
+        if (tile) {
+          this.tiles.delete(k);
+          this.tiles.set(k, tile);
+        } else if (made < budget) {
+          this.tiles.set(k, renderTile(this.world, tx, ty, this.S));
+          made++;
+        }
       }
-      if (made >= budget) continue;
-      this.tiles.set(k, renderTile(this.world, tx, ty, this.S, this.grain));
-      made++;
-    }
-    while (this.tiles.size > maxTiles) this.tiles.delete(this.tiles.keys().next().value!);
+    const max = this.quality ? 24 : 40;
+    while (this.tiles.size > max) this.tiles.delete(this.tiles.keys().next().value!);
   }
 
-  private spriteFor(p: Place, variant: number) {
-    let list = this.sprites.get(p.id);
-    if (!list) {
-      list = [];
-      this.sprites.set(p.id, list);
-    }
-    if (!list[variant]) {
-      const c = document.createElement("canvas");
-      c.width = Math.ceil(p.box.w * this.S);
-      c.height = Math.ceil(p.box.h * this.S);
+  private sprite(key: string, box: SpriteBox, paint: (g: Ctx) => void) {
+    let c = this.sprites.get(key);
+    if (!c) {
+      c = document.createElement("canvas");
+      c.width = Math.ceil(box.w * this.S);
+      c.height = Math.ceil(box.h * this.S);
       const g = c.getContext("2d")!;
       g.scale(this.S, this.S);
-      g.translate(p.box.ax, p.box.ay);
-      drawLandmark(g, mulberry32(p.x * 7 + p.y * 13 + variant * 991), p);
-      list[variant] = c;
+      g.translate(box.ax, box.ay);
+      paint(g);
+      this.sprites.set(key, c);
     }
-    return list[variant];
-  }
-
-  private carSprite(variant: number) {
-    if (!this.carSprites[variant]) {
-      const c = document.createElement("canvas");
-      const W = 76;
-      const H = 52;
-      c.width = Math.ceil(W * this.S);
-      c.height = Math.ceil(H * this.S);
-      const g = c.getContext("2d")!;
-      g.scale(this.S, this.S);
-      g.translate(W / 2, H / 2);
-      const r = mulberry32(21 + variant * 57);
-      // Little jeep, top-down, facing +x.
-      const body: [number, number][] = [[-27, -15], [22, -15], [29, -9], [29, 9], [22, 15], [-27, 15]];
-      fillPaper(g, body);
-      wash(g, body, CAR_COLOR, r, { alpha: 0.9, spread: 1.2 });
-      sketchPoly(g, body, r, { width: 1.8 });
-      const glass: [number, number][] = [[4, -12], [12, -10], [12, 10], [4, 12]];
-      fillPaper(g, glass, "#e8f1f8");
-      sketchPoly(g, glass, r, { width: 1.3 });
-      const roll = rectPts(-16, -13, 16, 26);
-      sketchPoly(g, roll, r, { width: 1.6 });
-      edge(g, [-8, -13], [-8, 13], r, { width: 1.2, passes: 1 });
-      edge(g, [16, -14], [16, 14], r, { width: 1, passes: 1 });
-      const spare = ellipsePts(-31, 0, 6, 8, r, 0.05);
-      fillPaper(g, spare, "#4a4a50");
-      scribble(g, spare, r, { width: 1.2 });
-      g.fillStyle = "#ffd166";
-      for (const y of [-9, 9]) {
-        g.beginPath();
-        g.arc(28, y, 3, 0, Math.PI * 2);
-        g.fill();
-      }
-      this.carSprites[variant] = c;
-    }
-    return this.carSprites[variant];
-  }
-
-  private bodySprite(kind: BodyKind) {
-    let c = this.bodySprites.get(kind);
-    if (c) return c;
-    const size = kind === "ball" ? 60 : kind === "crate" ? 40 : 24;
-    c = document.createElement("canvas");
-    c.width = c.height = Math.ceil(size * this.S);
-    const g = c.getContext("2d")!;
-    g.scale(this.S, this.S);
-    g.translate(size / 2, size / 2);
-    const r = mulberry32(kind.length * 101);
-    if (kind === "crate") {
-      const box = rectPts(-15, -15, 30, 30);
-      fillPaper(g, box);
-      wash(g, box, "#c79a62", r, { alpha: 0.55, spread: 1 });
-      sketchPoly(g, box, r, { width: 1.6 });
-      edge(g, [-15, -15], [15, 15], r, { width: 1.1, passes: 1 });
-      edge(g, [15, -15], [-15, 15], r, { width: 1.1, passes: 1 });
-    } else if (kind === "pin") {
-      const pin = ellipsePts(0, 0, 8.5, 8.5, r, 0.04);
-      fillPaper(g, pin, "#fffdf8");
-      scribble(g, pin, r, { width: 1.3 });
-      g.strokeStyle = "#e5484d";
-      g.lineWidth = 2.5;
-      g.beginPath();
-      g.arc(0, 0, 5, 0, Math.PI * 2);
-      g.stroke();
-    } else {
-      for (let i = 0; i < 6; i++) {
-        g.fillStyle = CONFETTI[i];
-        g.globalAlpha = 0.8;
-        g.beginPath();
-        g.moveTo(0, 0);
-        g.arc(0, 0, 24, (i / 6) * Math.PI * 2, ((i + 1) / 6) * Math.PI * 2);
-        g.closePath();
-        g.fill();
-      }
-      g.globalAlpha = 1;
-      scribble(g, ellipsePts(0, 0, 24, 24, r, 0.03), r, { width: 1.8 });
-      fillPaper(g, ellipsePts(0, 0, 6, 6, r, 0.05), "#fffdf8");
-    }
-    this.bodySprites.set(kind, c);
     return c;
+  }
+
+  private foliageSprite(kind: Foliage, variant: number) {
+    return this.sprite(`f:${kind}:${variant}`, FOLIAGE_BOX[kind], (g) => paintFoliage(g, kind, mulberry32(kind.length * 97 + variant * 13)));
+  }
+
+  private propSprite(kind: PropKind, variant: number) {
+    return this.sprite(`p:${kind}:${variant}`, PROP_BOX[kind], (g) => paintProp(g, kind, mulberry32(kind.length * 31 + variant * 7)));
+  }
+
+  private placeSprite(p: Place) {
+    return this.sprite(`pl:${p.id}`, p.box, (g) => paintPlace(g, mulberry32(p.x * 7 + p.y * 13), p));
+  }
+
+  private bodySprite(b: Body) {
+    const size = BODY_SIZE[b.kind];
+    return this.sprite(`b:${b.kind}:${b.char}`, { w: size, h: size, ax: size / 2, ay: size / 2 }, (g) => paintBody(g, b.kind, b.char));
   }
 
   // -------------------------------------------------------------------------
@@ -400,49 +362,90 @@ export class SketchEngine {
   // -------------------------------------------------------------------------
 
   private spawnBodies() {
-    const add = (kind: BodyKind, x: number, y: number) => {
-      const r = kind === "ball" ? 22 : kind === "crate" ? 15 : 8;
-      const m = kind === "ball" ? 0.9 : kind === "crate" ? 1.3 : 0.35;
-      this.bodies.push({ kind, x, y, vx: 0, vy: 0, a: Math.random() * 0.4, va: 0, r, m, hx: x, hy: y });
+    const add = (kind: BodyKind, x: number, y: number, char = "") => {
+      const r = { crate: 16, pin: 9, ball: 22, brick: 11, letter: 25 }[kind];
+      const m = { crate: 1.3, pin: 0.35, ball: 0.9, brick: 0.7, letter: 1.4 }[kind];
+      this.bodies.push({ kind, char, x, y, vx: 0, vy: 0, a: 0, va: 0, r, m, hx: x, hy: y, ha: 0, order: this.bodies.length, disturbed: -99, lift: 0, rb: null });
     };
-    for (let row = 0; row < 4; row++)
-      for (let i = 0; i <= row; i++) add("pin", BOWLING.x + row * 22, BOWLING.y + (i - row / 2) * 22);
-    const crates: [number, number][] = [
-      [2010, 1450], [2042, 1462], [2022, 1488],
-      [1330, 1080], [1300, 1104],
-      [1160, 1560], [2060, 820], [2560, 1500], [700, 1060], [2650, 980],
-    ];
-    for (const [x, y] of crates) add("crate", x, y);
-    add("ball", 1470, 1330);
+    const chars = NAME.text.split("");
+    chars.forEach((ch, i) => {
+      if (ch !== " ") add("letter", NAME.x + (i - (chars.length - 1) / 2) * NAME.advance, NAME.y, ch);
+    });
+    for (let row = 0; row < 4; row++) for (let i = 0; i <= row; i++) add("pin", BOWLING.x + (i - row / 2) * 22, BOWLING.y + row * 22);
+    for (let row = 0; row < 2; row++) for (let i = 0; i < 9; i++) add("brick", 1820 + i * 25 + row * 12, 2140 + row * 17);
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) add("crate", 1880 + i * 34, 1950 + j * 34);
+    for (const [x, y] of [[2560, 1440], [2594, 1452], [960, 1460], [1300, 700], [2140, 860]]) add("crate", x, y);
+    add("ball", 1700, 2100);
+    add("ball", 1890, 1460);
   }
 
-  private resetPins() {
-    for (const b of this.bodies) {
-      if (b.kind !== "pin") continue;
-      this.puff(b.x, b.y, 1);
-      b.x = b.hx;
-      b.y = b.hy;
-      b.vx = b.vy = b.va = 0;
-      b.a = 0;
+  private spawnButterflies() {
+    const r = mulberry32(55);
+    const colors = ["#ffd34d", "#ff9ec7", "#ffffff", "#9fd3ff", "#ffb347"];
+    for (let i = 0; i < 9; i++) {
+      const d = districts[i % districts.length].court;
+      const x = d.x + (r() - 0.5) * d.rx * 2.4;
+      const y = d.y + (r() - 0.5) * d.ry * 2.4;
+      this.butterflies.push({ x, y, tx: x, ty: y, color: colors[i % colors.length], phase: r() * 6 });
     }
-    this.strike = { firstKnock: 0, done: false };
   }
 
-  private spawn(p: Omit<Particle, "rot" | "vr"> & Partial<Pick<Particle, "rot" | "vr">>) {
+  private spawn(p: Partial<Particle> & Pick<Particle, "kind" | "x" | "y" | "max" | "color">) {
     if (this.particles.length >= this.maxParticles) return;
-    this.particles.push({ rot: 0, vr: 0, ...p });
+    this.particles.push({ z: 0, vx: 0, vy: 0, vz: 0, life: 0, size: 4, rot: 0, vr: 0, ...p });
   }
 
-  private puff(x: number, y: number, n: number) {
+  private sparkles(x: number, y: number, n: number, color = "#fff6c8") {
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2;
-      const s = 40 + Math.random() * 120;
-      this.spawn({ kind: "dust", x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s * 0.6, life: 0, max: 0.6 + Math.random() * 0.4, size: 5 + Math.random() * 6, color: INK_SOFT });
+      const s = 30 + Math.random() * 90;
+      this.spawn({ kind: "sparkle", x: x + Math.cos(a) * 10, y, z: 10 + Math.random() * 30, vx: Math.cos(a) * s, vy: Math.sin(a) * s * 0.5, vz: 40 + Math.random() * 60, max: 0.7 + Math.random() * 0.5, size: 3 + Math.random() * 3, color });
     }
   }
 
-  private say(text: string, x: number, y: number, color = INK, size = 30) {
-    this.spawn({ kind: "text", x, y, vx: 0, vy: -40, life: 0, max: 1.1, size, color, text, rot: (Math.random() - 0.5) * 0.3 });
+  private say(str: string, x: number, y: number, color = "#2c3a36", size = 30) {
+    this.spawn({ kind: "text", x, y, vy: -40, max: 1.1, size, color, text: str, rot: (Math.random() - 0.5) * 0.25 });
+  }
+
+  private leaves(x: number, y: number, n: number, blossom: boolean) {
+    const cols = blossom ? ["#f7c2d6", "#ffe3ee", "#e88bb0"] : ["#88c262", "#5a9548", "#b5d987"];
+    for (let i = 0; i < n; i++) {
+      this.spawn({
+        kind: "leaf",
+        x: x + (Math.random() - 0.5) * 40,
+        y,
+        z: 40 + Math.random() * 50,
+        vx: (Math.random() - 0.5) * 120,
+        vy: (Math.random() - 0.5) * 50,
+        vz: Math.random() * 60,
+        max: 1.4 + Math.random() * 0.8,
+        size: 4 + Math.random() * 2,
+        color: cols[i % 3],
+        rot: Math.random() * 6,
+        vr: (Math.random() - 0.5) * 8,
+      });
+    }
+  }
+
+  private debris(x: number, y: number, colors: string[], n: number, vx: number, vy: number) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const s = 60 + Math.random() * 160;
+      this.spawn({
+        kind: "debris",
+        x,
+        y,
+        z: 10 + Math.random() * 20,
+        vx: Math.cos(a) * s + vx * 0.4,
+        vy: Math.sin(a) * s * 0.6 + vy * 0.4,
+        vz: 120 + Math.random() * 160,
+        max: 2.2 + Math.random(),
+        size: 4 + Math.random() * 5,
+        color: colors[i % colors.length],
+        rot: Math.random() * 6,
+        vr: (Math.random() - 0.5) * 14,
+      });
+    }
   }
 
   private breakTracks() {
@@ -456,13 +459,7 @@ export class SketchEngine {
     const by = y - Math.sin(a) * 16;
     const nx = -Math.sin(a) * 13;
     const ny = Math.cos(a) * 13;
-    const o = this.trackHead * 6;
-    this.tracks[o] = bx + nx;
-    this.tracks[o + 1] = by + ny;
-    this.tracks[o + 2] = bx - nx;
-    this.tracks[o + 3] = by - ny;
-    this.tracks[o + 4] = this.t;
-    this.tracks[o + 5] = intensity;
+    this.tracks.set([bx + nx, by + ny, bx - nx, by - ny, this.t, intensity], this.trackHead * 6);
     this.trackHead = (this.trackHead + 1) % TRACK_N;
     this.trackCount = Math.min(TRACK_N, this.trackCount + 1);
   }
@@ -478,7 +475,7 @@ export class SketchEngine {
     const k = e.key.toLowerCase();
     const target = e.target as HTMLElement | null;
     if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
-    if (!SketchEngine.DRIVE_KEYS.has(k)) {
+    if (!WorldEngine.DRIVE_KEYS.has(k)) {
       if (k === "r") this.resetCar();
       return;
     }
@@ -498,13 +495,9 @@ export class SketchEngine {
 
   private onVisibility = () => {
     if (document.hidden) {
-      cancelAnimationFrame(this.raf);
-      this.raf = 0;
+      this.stop();
       this.keys.clear();
-    } else if (this.ready && !this.raf) {
-      this.last = performance.now();
-      this.raf = requestAnimationFrame(this.frame);
-    }
+    } else this.start();
   };
 
   private toWorld(cx: number, cy: number) {
@@ -515,15 +508,15 @@ export class SketchEngine {
   private hitPlace(cx: number, cy: number): Place | null {
     const { x, y } = this.toWorld(cx, cy);
     let best: Place | null = null;
-    let bestArea = Infinity;
+    let bestD = Infinity;
     for (const p of places) {
       const x0 = p.x - p.box.ax;
       const y0 = p.y - p.box.ay;
-      if (x > x0 && x < x0 + p.box.w && y > y0 && y < y0 + p.box.h) {
-        const area = p.box.w * p.box.h;
-        if (area < bestArea) {
+      if (x > x0 && x < x0 + p.box.w && y > y0 && y < p.y + 70) {
+        const d = Math.abs(x - p.x) + Math.abs(y - p.y);
+        if (d < bestD) {
           best = p;
-          bestArea = area;
+          bestD = d;
         }
       }
     }
@@ -574,13 +567,14 @@ export class SketchEngine {
     const dt = Math.min(rawDt, 1 / 30);
     this.t += dt;
 
-    // Quality check: if a few seconds run slow, step down (at most twice).
-    if (this.quality < 2 && this.frameSamples < 150) {
+    // If a couple of seconds run slow, step quality down; very slow jumps straight to the lightest mode.
+    if (this.quality < 2 && this.frameSamples < 100) {
       this.frameSamples++;
-      if (this.frameSamples > 30) this.frameTotal += Math.min(rawDt, 0.25);
-      if (this.frameSamples === 150) {
-        if (this.frameTotal / 120 > 1 / 40) {
-          this.stepDownQuality();
+      if (this.frameSamples > 20) this.frameTotal += Math.min(rawDt, 0.25);
+      if (this.frameSamples === 100) {
+        const avg = this.frameTotal / 80;
+        if (avg > 1 / 40) {
+          this.stepDownQuality(avg > 1 / 26 ? 2 : 1);
           this.frameSamples = 0;
         }
         this.frameTotal = 0;
@@ -588,7 +582,7 @@ export class SketchEngine {
     }
 
     this.update(dt);
-    this.ensureTiles(this.low ? 1 : 2);
+    this.ensureTiles(this.quality ? 1 : 2);
     this.render();
     this.raf = requestAnimationFrame(this.frame);
   };
@@ -628,57 +622,53 @@ export class SketchEngine {
     let inPond = false;
     for (const p of PONDS) if (((car.x - p.x) / p.rx) ** 2 + ((car.y - p.y) / p.ry) ** 2 < 1) inPond = true;
     const top = inPond ? MAX_SPEED * 0.45 : MAX_SPEED;
-
-    if (throttle > 0) fwd += (fwd < 0 ? 1500 : 780) * throttle * dt;
+    if (throttle > 0) fwd += (fwd < 0 ? 1500 : 800) * throttle * dt;
     else if (throttle < 0) fwd += (fwd > 0 ? 1500 : 620) * throttle * dt;
     fwd *= Math.exp(-dt * (throttle === 0 ? 2.2 : 0.8));
     if (inPond) fwd *= Math.exp(-dt * 2.5);
     fwd = clamp(fwd, -240, top);
     const slip = Math.abs(lat);
     lat *= Math.exp(-dt * (drift ? 1.4 : 9));
-
-    const turn = car.steer * 2.9 * clamp(fwd / 170, -1, 1) * (drift ? 1.25 : 1);
-    car.a = wrapAngle(car.a + turn * dt);
+    car.a = wrapAngle(car.a + car.steer * 2.9 * clamp(fwd / 170, -1, 1) * (drift ? 1.25 : 1) * dt);
     const nfx = Math.cos(car.a);
     const nfy = Math.sin(car.a);
     car.vx = nfx * fwd - nfy * lat;
     car.vy = nfy * fwd + nfx * lat;
     car.x += car.vx * dt;
     car.y += car.vy * dt;
-
     this.collideCar();
 
-    // Tracks + dust.
     const speed = Math.hypot(car.vx, car.vy);
     if (Math.hypot(car.x - this.lastTrack.x, car.y - this.lastTrack.y) > 9 && speed > 30) {
       this.pushTrack(clamp(0.16 + slip / 300, 0.16, 0.75));
       this.lastTrack = { x: car.x, y: car.y };
     }
-    const dustChance = (slip > 120 ? 0.6 : speed > 380 && throttle > 0 ? 0.18 : 0) * (this.low ? 0.4 : 1);
+    const dustChance = (slip > 120 ? 0.6 : speed > 380 && throttle > 0 ? 0.2 : 0) * (this.quality ? 0.4 : 1);
     if (Math.random() < dustChance) {
-      const bx = car.x - nfx * 22;
-      const by = car.y - nfy * 22;
-      this.spawn({ kind: "dust", x: bx, y: by, vx: -car.vx * 0.15 + (Math.random() - 0.5) * 40, vy: -car.vy * 0.15 + (Math.random() - 0.5) * 40, life: 0, max: 0.7, size: 5, color: INK_SOFT });
+      this.spawn({ kind: "dust", x: car.x - nfx * 24, y: car.y - nfy * 24, vx: -car.vx * 0.15 + (Math.random() - 0.5) * 40, vy: -car.vy * 0.15 + (Math.random() - 0.5) * 40, max: 0.8, size: 6, color: "#e9d6ae" });
     }
-    if (inPond && speed > 80 && Math.random() < 0.25) {
-      this.spawn({ kind: "ripple", x: car.x, y: car.y, vx: 0, vy: 0, life: 0, max: 1.2, size: 10, color: INK_SOFT });
-    }
-    if (speed > 120 && this.world && Math.random() < 0.35) {
-      for (const b of this.world.bushes) {
-        if (Math.abs(b.x - car.x) < b.r + CAR_R && Math.abs(b.y - car.y) < b.r + CAR_R) {
-          this.leaf(car.x, car.y - 10);
-          break;
-        }
+    if (inPond && speed > 80 && Math.random() < 0.3) this.spawn({ kind: "ripple", x: car.x, y: car.y, max: 1.2, size: 10, color: "#ffffff" });
+
+    if (this.world && speed > 60) {
+      // Bushes: drive straight through them; they shiver and shed leaves.
+      const st = this.world.standing;
+      for (let i = 0; i < st.length; i++) {
+        const s = st[i];
+        if (s.kind !== "bush" || Math.abs(s.x - car.x) > 40 || Math.abs(s.y - 10 - car.y) > 34) continue;
+        this.kickTree(i, speed / 2000);
+        if (Math.random() < 0.3) this.leaves(s.x, s.y, 1, false);
       }
     }
 
+    this.updateSprings(dt);
     this.updateBodies(dt);
+    this.updateProps();
     this.updateParticles(dt);
+    this.updateAmbient(dt);
     this.updateNear();
 
-    // Camera, with a little look-ahead.
     const tx = car.x + car.vx * 0.32;
-    const ty = car.y + car.vy * 0.32 - 60;
+    const ty = car.y + car.vy * 0.32 - 70;
     const k = 1 - Math.exp(-dt * 3.2);
     this.cam.x += (tx - this.cam.x) * k;
     this.cam.y += (ty - this.cam.y) * k;
@@ -688,28 +678,36 @@ export class SketchEngine {
     this.shake *= Math.exp(-dt * 9);
   }
 
-  private leaf(x: number, y: number) {
-    this.spawn({
-      kind: "leaf",
-      x: x + (Math.random() - 0.5) * 30,
-      y: y + (Math.random() - 0.5) * 20,
-      vx: (Math.random() - 0.5) * 120,
-      vy: -60 - Math.random() * 80,
-      life: 0,
-      max: 1 + Math.random() * 0.6,
-      size: 4 + Math.random() * 3,
-      color: INK,
-      rot: Math.random() * 6,
-      vr: (Math.random() - 0.5) * 8,
-    });
+  private kickTree(i: number, amount: number) {
+    this.treeVel[i] += amount * (Math.random() < 0.5 ? -1 : 1);
+    this.activeTrees.add(i);
+  }
+
+  private updateSprings(dt: number) {
+    for (const i of this.activeTrees) {
+      const a = -90 * this.treeWob[i] - 7 * this.treeVel[i];
+      this.treeVel[i] += a * dt;
+      this.treeWob[i] += this.treeVel[i] * dt;
+      if (Math.abs(this.treeWob[i]) < 0.001 && Math.abs(this.treeVel[i]) < 0.01) {
+        this.treeWob[i] = this.treeVel[i] = 0;
+        this.activeTrees.delete(i);
+      }
+    }
+    for (let i = 0; i < places.length; i++) {
+      if (!this.placeWob[i] && !this.placeVel[i]) continue;
+      const a = -140 * this.placeWob[i] - 9 * this.placeVel[i];
+      this.placeVel[i] += a * dt;
+      this.placeWob[i] += this.placeVel[i] * dt;
+      if (Math.abs(this.placeWob[i]) < 0.001 && Math.abs(this.placeVel[i]) < 0.01) this.placeWob[i] = this.placeVel[i] = 0;
+    }
   }
 
   private collideCar() {
     const car = this.car;
-    const minX = FENCE + CAR_R + 4;
-    const maxX = WORLD_W - FENCE - CAR_R - 4;
-    const minY = FENCE + CAR_R + 4;
-    const maxY = WORLD_H - FENCE - CAR_R - 4;
+    const minX = EDGE + CAR_R;
+    const maxX = WORLD_W - EDGE - CAR_R;
+    const minY = EDGE + CAR_R;
+    const maxY = WORLD_H - EDGE - CAR_R;
     if (car.x < minX || car.x > maxX) {
       car.x = clamp(car.x, minX, maxX);
       this.bonk(Math.abs(car.vx));
@@ -721,9 +719,9 @@ export class SketchEngine {
       car.vy *= -0.35;
     }
     if (!this.world) return;
-    const ids = queryColliders(this.world, car.x, car.y, this.colliderScratch);
-    for (const i of ids) {
+    for (const i of queryColliders(this.world, car.x, car.y, this.scratch)) {
       const c = this.world.colliders[i];
+      if (c.ref.type === "prop" && this.world.props[c.ref.i].brokenAt >= 0) continue;
       const dx = car.x - c.x;
       const dy = car.y - c.y;
       const min = CAR_R + c.r;
@@ -732,16 +730,40 @@ export class SketchEngine {
       const d = Math.sqrt(d2) || 0.01;
       const nx = dx / d;
       const ny = dy / d;
+      const vn = car.vx * nx + car.vy * ny;
+      if (c.ref.type === "prop" && -vn > 110) {
+        this.breakProp(c.ref.i, car.vx, car.vy);
+        car.vx *= 0.82;
+        car.vy *= 0.82;
+        continue;
+      }
       car.x += nx * (min - d);
       car.y += ny * (min - d);
-      const vn = car.vx * nx + car.vy * ny;
       if (vn < 0) {
         car.vx -= 1.35 * vn * nx;
         car.vy -= 1.35 * vn * ny;
         this.bonk(-vn);
-        if (c.leafy && -vn > 90) for (let k = 0; k < (this.low ? 3 : 7); k++) this.leaf(c.x, c.y - 24);
+        if (c.ref.type === "tree") {
+          this.kickTree(c.ref.i, -vn / 260);
+          const s = this.world.standing[c.ref.i];
+          if (-vn > 90) this.leaves(s.x, s.y, this.quality ? 3 : 7, s.kind === "blossom");
+        } else if (c.ref.type === "place") {
+          this.placeVel[c.ref.i] += -vn / 180;
+        }
       }
     }
+  }
+
+  private breakProp(i: number, vx: number, vy: number) {
+    const p = this.world!.props[i];
+    p.brokenAt = this.t;
+    p.regrowAt = -1;
+    this.debris(p.x, p.y - 12, PROP_DEBRIS[p.kind], this.quality ? 5 : 10, vx, vy);
+    if (this.t - this.lastBonk > 0.8) {
+      this.lastBonk = this.t;
+      this.say(["crash!", "oops", "smash!", "kaboom"][Math.floor(Math.random() * 4)], p.x, p.y - 50);
+    }
+    if (!this.reduced) this.shake = Math.max(this.shake, 4);
   }
 
   private bonk(impact: number) {
@@ -749,9 +771,20 @@ export class SketchEngine {
     if (!this.reduced) this.shake = Math.min(10, impact / 50);
     if (this.t - this.lastBonk > 0.6) {
       this.lastBonk = this.t;
-      const words = ["bonk!", "oof", "boop!", "whoops", "thud"];
-      this.say(words[Math.floor(Math.random() * words.length)], this.car.x, this.car.y - 46);
-      this.puff(this.car.x, this.car.y, 6);
+      this.say(["bonk!", "oof", "boop!", "whoops", "thud"][Math.floor(Math.random() * 5)], this.car.x, this.car.y - 50);
+    }
+  }
+
+  private updateProps() {
+    if (!this.world) return;
+    for (const p of this.world.props) {
+      if (p.brokenAt >= 0 && this.t - p.brokenAt > REGROW_AFTER && Math.hypot(this.car.x - p.x, this.car.y - p.y) > 150) {
+        p.brokenAt = -1;
+        p.regrowAt = this.t;
+        this.sparkles(p.x, p.y, this.quality ? 3 : 6);
+      } else if (p.regrowAt >= 0 && this.t - p.regrowAt > 0.6) {
+        p.regrowAt = -1;
+      }
     }
   }
 
@@ -759,6 +792,20 @@ export class SketchEngine {
     const car = this.car;
     const bodies = this.bodies;
     for (const b of bodies) {
+      if (b.rb) {
+        const e = easeInOut(clamp((this.t - b.rb.t0 - b.rb.delay) / 0.8, 0, 1));
+        b.x = b.rb.fx + (b.hx - b.rb.fx) * e;
+        b.y = b.rb.fy + (b.hy - b.rb.fy) * e;
+        b.a = b.rb.fa + wrapAngle(b.ha - b.rb.fa) * e;
+        b.lift = Math.sin(Math.PI * e) * 34;
+        if (e >= 1) {
+          b.rb = null;
+          b.lift = 0;
+          b.vx = b.vy = b.va = 0;
+          if (b.kind !== "pin" && b.kind !== "brick") this.sparkles(b.x, b.y, 2);
+        }
+        continue;
+      }
       const friction = b.kind === "ball" ? 0.7 : b.kind === "pin" ? 1.8 : 2.6;
       b.vx *= Math.exp(-dt * friction);
       b.vy *= Math.exp(-dt * friction);
@@ -767,7 +814,6 @@ export class SketchEngine {
       b.y += b.vy * dt;
       b.a += b.va * dt;
 
-      // Car vs body.
       const dx = b.x - car.x;
       const dy = b.y - car.y;
       const min = b.r + CAR_R;
@@ -784,8 +830,8 @@ export class SketchEngine {
           b.vy += (j / b.m) * ny;
           car.vx -= (j / CAR_M) * nx;
           car.vy -= (j / CAR_M) * ny;
-          const tang = (b.vx - car.vx) * -ny + (b.vy - car.vy) * nx;
-          b.va += tang * 0.02 + (Math.random() - 0.5) * j * 0.01;
+          b.va += ((b.vx - car.vx) * -ny + (b.vy - car.vy) * nx) * 0.02 + (Math.random() - 0.5) * j * 0.01;
+          b.disturbed = this.t;
         }
         const overlap = min - d;
         const share = CAR_M / (CAR_M + b.m);
@@ -795,12 +841,12 @@ export class SketchEngine {
         car.y -= ny * overlap * (1 - share);
       }
     }
-    // Body vs body + static.
     for (let i = 0; i < bodies.length; i++) {
       const a = bodies[i];
-      const moving = a.vx * a.vx + a.vy * a.vy > 4;
+      if (a.rb) continue;
       for (let j = i + 1; j < bodies.length; j++) {
         const b = bodies[j];
+        if (b.rb) continue;
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const min = a.r + b.r;
@@ -812,13 +858,14 @@ export class SketchEngine {
         const ny = dy / d;
         const rel = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
         if (rel < 0) {
-          const jimp = (-(1.6 * rel)) / (1 / a.m + 1 / b.m);
+          const jimp = -(1.6 * rel) / (1 / a.m + 1 / b.m);
           a.vx -= (jimp / a.m) * nx;
           a.vy -= (jimp / a.m) * ny;
           b.vx += (jimp / b.m) * nx;
           b.vy += (jimp / b.m) * ny;
           a.va += (Math.random() - 0.5) * 4;
           b.va += (Math.random() - 0.5) * 4;
+          if (rel < -10) a.disturbed = b.disturbed = this.t;
         }
         const push = (min - d) / 2;
         a.x -= nx * push;
@@ -826,17 +873,18 @@ export class SketchEngine {
         b.x += nx * push;
         b.y += ny * push;
       }
-      if (!moving || !this.world) continue;
-      if (a.x < FENCE + a.r || a.x > WORLD_W - FENCE - a.r) {
-        a.x = clamp(a.x, FENCE + a.r, WORLD_W - FENCE - a.r);
+      if (a.vx * a.vx + a.vy * a.vy < 4 || !this.world) continue;
+      if (a.x < EDGE + a.r || a.x > WORLD_W - EDGE - a.r) {
+        a.x = clamp(a.x, EDGE + a.r, WORLD_W - EDGE - a.r);
         a.vx *= -0.5;
       }
-      if (a.y < FENCE + a.r || a.y > WORLD_H - FENCE - a.r) {
-        a.y = clamp(a.y, FENCE + a.r, WORLD_H - FENCE - a.r);
+      if (a.y < EDGE + a.r || a.y > WORLD_H - EDGE - a.r) {
+        a.y = clamp(a.y, EDGE + a.r, WORLD_H - EDGE - a.r);
         a.vy *= -0.5;
       }
-      for (const ci of queryColliders(this.world, a.x, a.y, this.colliderScratch)) {
+      for (const ci of queryColliders(this.world, a.x, a.y, this.scratch)) {
         const c = this.world.colliders[ci];
+        if (c.ref.type === "prop" && this.world.props[c.ref.i].brokenAt >= 0) continue;
         const dx = a.x - c.x;
         const dy = a.y - c.y;
         const min = a.r + c.r;
@@ -845,53 +893,44 @@ export class SketchEngine {
         const d = Math.sqrt(d2) || 0.01;
         const nx = dx / d;
         const ny = dy / d;
+        const vn = a.vx * nx + a.vy * ny;
+        if (c.ref.type === "prop" && -vn > 200) {
+          this.breakProp(c.ref.i, a.vx, a.vy);
+          continue;
+        }
         a.x += nx * (min - d);
         a.y += ny * (min - d);
-        const vn = a.vx * nx + a.vy * ny;
         if (vn < 0) {
           a.vx -= 1.5 * vn * nx;
           a.vy -= 1.5 * vn * ny;
+          if (c.ref.type === "tree") this.kickTree(c.ref.i, -vn / 400);
         }
       }
     }
 
+    // Anything knocked out of place glides back home after a short rest.
+    for (const b of bodies) {
+      if (b.rb) continue;
+      const displaced = Math.hypot(b.x - b.hx, b.y - b.hy) > 5 || Math.abs(wrapAngle(b.a - b.ha)) > 0.12;
+      if (!displaced || this.t - b.disturbed < REBUILD_AFTER) continue;
+      if (b.vx * b.vx + b.vy * b.vy > 64 || Math.hypot(car.x - b.hx, car.y - b.hy) < 170) continue;
+      b.rb = { t0: this.t, delay: b.kind === "letter" ? b.order * 0.06 : Math.random() * 0.4, fx: b.x, fy: b.y, fa: b.a };
+      b.vx = b.vy = b.va = 0;
+    }
+
     // Bowling.
     let knocked = 0;
-    let settled = true;
-    for (const b of bodies) {
-      if (b.kind !== "pin") continue;
-      if (Math.hypot(b.x - b.hx, b.y - b.hy) > 18) knocked++;
-      if (b.vx * b.vx + b.vy * b.vy > 25) settled = false;
-    }
-    if (knocked > 0 && !this.strike.firstKnock) this.strike.firstKnock = this.t;
+    for (const b of bodies) if (b.kind === "pin" && Math.hypot(b.x - b.hx, b.y - b.hy) > 18) knocked++;
+    if (knocked === 0) this.strike = { firstKnock: 0, done: false };
+    else if (!this.strike.firstKnock) this.strike.firstKnock = this.t;
     if (!this.strike.done && knocked >= 9 && this.t - this.strike.firstKnock < 4) {
       this.strike.done = true;
-      this.say("STRIKE!", BOWLING.x + 40, BOWLING.y - 70, "#d6409f", 64);
-      for (let i = 0; i < (this.low ? 14 : 36); i++) {
+      this.say("STRIKE!", BOWLING.x, BOWLING.y - 60, "#cf4f97", 64);
+      for (let i = 0; i < (this.quality ? 14 : 36); i++) {
         const a = Math.random() * Math.PI * 2;
         const s = 120 + Math.random() * 260;
-        this.spawn({
-          kind: "confetti",
-          x: BOWLING.x + 40,
-          y: BOWLING.y - 40,
-          vx: Math.cos(a) * s,
-          vy: Math.sin(a) * s - 160,
-          life: 0,
-          max: 1.4 + Math.random() * 0.6,
-          size: 5 + Math.random() * 4,
-          color: CONFETTI[i % CONFETTI.length],
-          rot: Math.random() * 6,
-          vr: (Math.random() - 0.5) * 12,
-        });
+        this.spawn({ kind: "confetti", x: BOWLING.x, y: BOWLING.y, z: 20, vx: Math.cos(a) * s, vy: Math.sin(a) * s * 0.6, vz: 200 + Math.random() * 200, max: 1.6 + Math.random() * 0.6, size: 5 + Math.random() * 4, color: CONFETTI[i % CONFETTI.length], rot: Math.random() * 6, vr: (Math.random() - 0.5) * 12 });
       }
-    }
-    if (
-      knocked > 0 &&
-      settled &&
-      this.t - this.strike.firstKnock > 7 &&
-      Math.hypot(car.x - BOWLING.x, car.y - BOWLING.y) > 420
-    ) {
-      this.resetPins();
     }
   }
 
@@ -908,13 +947,62 @@ export class SketchEngine {
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.rot += p.vr * dt;
-      if (p.kind === "dust") {
-        p.vx *= 0.94;
-        p.vy *= 0.94;
-      } else if (p.kind === "leaf" || p.kind === "confetti") {
-        p.vy += 260 * dt;
-        p.vx *= 0.98;
+      switch (p.kind) {
+        case "dust":
+          p.vx *= 0.94;
+          p.vy *= 0.94;
+          break;
+        case "debris":
+        case "confetti":
+        case "sparkle":
+          p.vz -= (p.kind === "sparkle" ? 120 : 520) * dt;
+          p.z += p.vz * dt;
+          if (p.z <= 0) {
+            p.z = 0;
+            p.vz *= -0.35;
+            p.vx *= 0.7;
+            p.vy *= 0.7;
+            p.vr *= 0.6;
+          }
+          break;
+        case "leaf":
+          p.vz = Math.max(p.vz - 60 * dt, -40);
+          p.z = Math.max(0, p.z + p.vz * dt);
+          p.vx += Math.sin(this.t * 3 + p.rot) * 30 * dt;
+          if (p.z === 0) {
+            p.vx *= 0.9;
+            p.vy *= 0.9;
+          }
+          break;
       }
+    }
+  }
+
+  private updateAmbient(dt: number) {
+    if (this.quality > 0 || this.reduced || !this.world) return;
+    // Petals drift from cherry trees near the camera.
+    const { left, top, vw, vh } = this.view();
+    if (Math.random() < 0.12) {
+      const st = this.world.standing;
+      const s = st[Math.floor(Math.random() * st.length)];
+      if (s.kind === "blossom" && s.x > left - 100 && s.x < left + vw + 100 && s.y > top - 100 && s.y < top + vh + 200) {
+        this.leaves(s.x, s.y, 1, true);
+      }
+    }
+    for (const b of this.butterflies) {
+      if (Math.hypot(b.tx - b.x, b.ty - b.y) < 12 || Math.random() < 0.005) {
+        b.tx = b.x + (Math.random() - 0.5) * 260;
+        b.ty = b.y + (Math.random() - 0.5) * 180;
+      }
+      const flee = Math.hypot(this.car.x - b.x, this.car.y - b.y) < 90;
+      if (flee) {
+        b.tx = b.x + (b.x - this.car.x) * 2;
+        b.ty = b.y + (b.y - this.car.y) * 2;
+      }
+      const sp = flee ? 160 : 45;
+      const d = Math.hypot(b.tx - b.x, b.ty - b.y) || 1;
+      b.x = clamp(b.x + ((b.tx - b.x) / d) * sp * dt, EDGE, WORLD_W - EDGE);
+      b.y = clamp(b.y + ((b.ty - b.y) / d) * sp * dt, EDGE, WORLD_H - EDGE);
     }
   }
 
@@ -923,9 +1011,7 @@ export class SketchEngine {
     let best: Place | null = null;
     let bestD = Infinity;
     for (const p of places) {
-      const cx = p.kind === "social" ? p.front[0] : p.x;
-      const cy = p.kind === "social" ? p.front[1] : p.y + 60;
-      const d = Math.hypot(car.x - cx, car.y - cy);
+      const d = Math.hypot(car.x - p.front[0], car.y - p.front[1]);
       if (d < p.triggerRadius && d < bestD) {
         best = p;
         bestD = d;
@@ -934,6 +1020,10 @@ export class SketchEngine {
     const id = best?.id ?? null;
     if (id !== this.near) {
       this.near = id;
+      if (best) {
+        this.placeVel[places.indexOf(best)] += 1.2;
+        this.sparkles(best.x, best.y - 40, this.quality ? 4 : 10, best.color);
+      }
       this.cb.onNear(id);
     }
   }
@@ -947,14 +1037,13 @@ export class SketchEngine {
     const S = this.S;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = "source-over";
     const shakeX = this.shake ? (Math.random() - 0.5) * this.shake : 0;
     const shakeY = this.shake ? (Math.random() - 0.5) * this.shake : 0;
     const { left, top, vw, vh } = this.view();
     const ox = Math.round(-(left + shakeX) * S);
     const oy = Math.round(-(top + shakeY) * S);
 
-    ctx.fillStyle = PAPER;
+    ctx.fillStyle = "#86b866";
     for (let tx = Math.floor(left / TILE); tx <= Math.floor((left + vw) / TILE); tx++)
       for (let ty = Math.floor(top / TILE); ty <= Math.floor((top + vh) / TILE); ty++) {
         const tile = this.tiles.get(`${tx},${ty}`);
@@ -965,66 +1054,150 @@ export class SketchEngine {
       }
 
     ctx.setTransform(S, 0, 0, S, ox, oy);
-    this.drawTracks();
-
-    const variant = this.variants > 1 ? Math.floor(this.t * 5) % this.variants : 0;
     const t = this.reduced ? 0 : this.t;
-    const inView = (x0: number, y0: number, x1: number, y1: number) =>
-      x1 > left && x0 < left + vw && y1 > top && y0 < top + vh;
+    this.drawWaterGlints(t, left, top, vw, vh);
+    this.drawTracks();
+    if (!this.world) return;
 
-    type D = { y: number; place?: Place; body?: Body; car?: true };
-    const list: D[] = [];
-    for (const p of places) {
-      const x0 = p.x - p.box.ax;
-      const y0 = p.y - p.box.ay - 120;
-      if (inView(x0, y0, x0 + p.box.w, y0 + p.box.h + 140)) list.push({ y: p.y, place: p });
+    // Gather everything that stands up, then paint back-to-front.
+    const inView = (x0: number, y0: number, x1: number, y1: number) => x1 > left && x0 < left + vw && y1 > top && y0 < top + vh;
+    const list = this.drawList;
+    list.length = 0;
+    const st = this.world.standing;
+    for (let i = 0; i < st.length; i++) {
+      const s = st[i];
+      const b = FOLIAGE_BOX[s.kind];
+      if (inView(s.x - b.ax * s.s, s.y - b.ay * s.s, s.x + b.ax * s.s, s.y + 20)) list.push({ y: s.y, k: 0, i });
     }
-    for (const b of this.bodies) if (inView(b.x - 30, b.y - 30, b.x + 30, b.y + 30)) list.push({ y: b.y, body: b });
-    list.push({ y: this.car.y + 6, car: true });
+    const props = this.world.props;
+    for (let i = 0; i < props.length; i++) {
+      const p = props[i];
+      if (p.brokenAt < 0 && inView(p.x - 40, p.y - 100, p.x + 40, p.y + 20)) list.push({ y: p.y, k: 1, i });
+    }
+    for (let i = 0; i < places.length; i++) {
+      const p = places[i];
+      if (inView(p.x - p.box.ax - 160, p.y - p.box.ay - 120, p.x - p.box.ax + p.box.w + 160, p.y - p.box.ay + p.box.h + 60)) list.push({ y: p.y, k: 2, i });
+    }
+    for (let i = 0; i < districts.length; i++) {
+      const g = districts[i].gate;
+      if (inView(g.x - 180, g.y - 220, g.x + 180, g.y + 40)) list.push({ y: g.y, k: 3, i });
+    }
+    for (let i = 0; i < DECOR.length; i++) {
+      const d = DECOR[i];
+      if (inView(d.x - 160, d.y - 220, d.x + 160, d.y + 60)) list.push({ y: d.y, k: 4, i });
+    }
+    for (let i = 0; i < this.bodies.length; i++) {
+      const b = this.bodies[i];
+      if (inView(b.x - 50, b.y - 90, b.x + 50, b.y + 50)) list.push({ y: b.y, k: 5, i });
+    }
+    list.push({ y: this.car.y + 6, k: 6, i: 0 });
     list.sort((a, b) => a.y - b.y);
 
+    const sway = this.quality || this.reduced ? 0 : 1;
     for (const d of list) {
-      if (d.place) {
-        const p = d.place;
-        const near = this.near === p.id;
-        const sprite = this.spriteFor(p, variant);
-        if (p.kind === "social" && near) {
-          const s = 1 + Math.abs(Math.sin(this.t * 6)) * 0.06;
-          ctx.save();
-          ctx.translate(p.x, p.y);
-          ctx.scale(s, s);
-          ctx.drawImage(sprite, -p.box.ax, -p.box.ay, p.box.w, p.box.h);
-          ctx.restore();
-        } else {
-          ctx.drawImage(sprite, p.x - p.box.ax, p.y - p.box.ay, p.box.w, p.box.h);
+      switch (d.k) {
+        case 0: {
+          const s = st[d.i];
+          const box = FOLIAGE_BOX[s.kind];
+          const wob = this.treeWob[d.i];
+          const low = s.kind === "bush" || s.kind === "rock";
+          const skew = low ? wob * 0.4 : sway * Math.sin(this.t * 1.3 + s.x * 0.013) * 0.014 + wob * 0.35;
+          const sc = S * s.s;
+          ctx.setTransform(sc, 0, -sc * skew, sc * (low ? 1 - Math.abs(wob) * 0.25 : 1), ox + S * s.x, oy + S * s.y);
+          ctx.drawImage(this.foliageSprite(s.kind, s.variant), -box.ax, -box.ay, box.w, box.h);
+          break;
         }
-        if (this.overlay) drawOverlay(ctx, p, t, this.overlay, near);
-      } else if (d.body) {
-        const b = d.body;
-        const spr = this.bodySprite(b.kind);
-        const size = b.kind === "ball" ? 60 : b.kind === "crate" ? 40 : 24;
-        ctx.save();
-        ctx.translate(b.x, b.y);
-        ctx.fillStyle = "rgba(51, 51, 58, 0.12)";
-        ctx.beginPath();
-        ctx.ellipse(4, b.r * 0.7, b.r, b.r * 0.4, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.rotate(b.a);
-        ctx.drawImage(spr, -size / 2, -size / 2, size, size);
-        ctx.restore();
-      } else {
-        this.drawCar(variant);
+        case 1: {
+          const p = props[d.i];
+          const box = PROP_BOX[p.kind];
+          const g = p.regrowAt >= 0 ? easeOutBack(clamp((this.t - p.regrowAt) / 0.55, 0, 1)) : 1;
+          ctx.setTransform(S * g, 0, 0, S * g, ox + S * p.x, oy + S * p.y);
+          ctx.drawImage(this.propSprite(p.kind, p.variant), -box.ax, -box.ay, box.w, box.h);
+          break;
+        }
+        case 2: {
+          const p = places[d.i];
+          const w = this.placeWob[d.i];
+          ctx.setTransform(S * (1 - w * 0.035), 0, -S * w * 0.02, S * (1 + w * 0.05), ox + S * p.x, oy + S * p.y);
+          ctx.drawImage(this.placeSprite(p), -p.box.ax, -p.box.ay, p.box.w, p.box.h);
+          ctx.setTransform(S, 0, 0, S, ox, oy);
+          if (this.overlay) drawPlaceOverlay(ctx, p, t, this.overlay, this.near === p.id);
+          break;
+        }
+        case 3: {
+          const dist = districts[d.i];
+          ctx.setTransform(S, 0, 0, S, ox + S * dist.gate.x, oy + S * dist.gate.y);
+          ctx.drawImage(this.sprite(`g:${dist.id}`, GATE_BOX, (g) => paintGate(g, dist)), -GATE_BOX.ax, -GATE_BOX.ay, GATE_BOX.w, GATE_BOX.h);
+          break;
+        }
+        case 4: {
+          const dc = DECOR[d.i];
+          const box = DECOR_BOX[dc.kind];
+          ctx.setTransform(S, 0, 0, S, ox + S * dc.x, oy + S * dc.y);
+          const spr = this.sprite(`d:${dc.kind}`, box, (g) =>
+            dc.kind === "fountain" ? paintFountain(g) : dc.kind === "campfire" ? paintCampfire(g, mulberry32(4)) : paintSignpost(g, districts),
+          );
+          ctx.drawImage(spr, -box.ax, -box.ay, box.w, box.h);
+          ctx.setTransform(S, 0, 0, S, ox, oy);
+          drawDecorOverlay(ctx, dc.kind, dc.x, dc.y, t);
+          break;
+        }
+        case 5: {
+          const b = this.bodies[d.i];
+          const size = BODY_SIZE[b.kind];
+          ctx.setTransform(S, 0, 0, S, ox, oy);
+          const shadowR = b.kind === "letter" ? 28 : b.r;
+          ctx.fillStyle = `rgba(24, 48, 44, ${0.28 * (1 - b.lift / 60)})`;
+          ctx.beginPath();
+          ctx.ellipse(b.x + 5, b.y + b.r * 0.55, shadowR, shadowR * 0.4, 0, 0, Math.PI * 2);
+          ctx.fill();
+          const cos = Math.cos(b.a) * S;
+          const sin = Math.sin(b.a) * S;
+          ctx.setTransform(cos, sin, -sin, cos, ox + S * b.x, oy + S * (b.y - b.lift));
+          ctx.drawImage(this.bodySprite(b), -size / 2, -size / 2, size, size);
+          break;
+        }
+        case 6:
+          this.drawCar(ox, oy);
+          break;
       }
     }
 
+    ctx.setTransform(S, 0, 0, S, ox, oy);
+    this.drawButterflies(left, top, vw, vh);
     this.drawParticles();
+    if (!this.quality && !this.reduced) this.drawCloudShadows(left, top, vw, vh);
+  }
+
+  private drawWaterGlints(t: number, left: number, top: number, vw: number, vh: number) {
+    const ctx = this.ctx;
+    ctx.fillStyle = "#ffffff";
+    for (const p of PONDS) {
+      if (p.x + p.rx < left || p.x - p.rx > left + vw || p.y + p.ry < top || p.y - p.ry > top + vh) continue;
+      for (let k = 0; k < 8; k++) {
+        const a = Math.max(0, Math.sin(t * 2.2 + k * 1.7));
+        if (a < 0.05) continue;
+        const gx = p.x + Math.sin(k * 12.9898) * p.rx * 0.6;
+        const gy = p.y + Math.cos(k * 78.233) * p.ry * 0.5;
+        const s = 2 + a * 3;
+        ctx.globalAlpha = a * 0.9;
+        ctx.beginPath();
+        ctx.moveTo(gx - s * 2, gy);
+        ctx.lineTo(gx, gy - s * 0.5);
+        ctx.lineTo(gx + s * 2, gy);
+        ctx.lineTo(gx, gy + s * 0.5);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
   }
 
   private drawTracks() {
     const ctx = this.ctx;
     const tr = this.tracks;
-    ctx.strokeStyle = INK;
-    ctx.lineWidth = 2.6;
+    ctx.strokeStyle = "#5d4a2c";
+    ctx.lineWidth = 3.2;
     ctx.lineCap = "round";
     for (let n = 1; n < this.trackCount; n++) {
       const i = (this.trackHead - this.trackCount + n + TRACK_N) % TRACK_N;
@@ -1034,7 +1207,7 @@ export class SketchEngine {
       if (tr[a + 5] < 0 || tr[b + 5] < 0) continue;
       const age = this.t - tr[a + 4];
       if (age > TRACK_LIFE) continue;
-      ctx.globalAlpha = tr[a + 5] * (1 - age / TRACK_LIFE) * 0.55;
+      ctx.globalAlpha = tr[a + 5] * (1 - age / TRACK_LIFE) * 0.45;
       ctx.beginPath();
       ctx.moveTo(tr[b], tr[b + 1]);
       ctx.lineTo(tr[a], tr[a + 1]);
@@ -1045,75 +1218,126 @@ export class SketchEngine {
     ctx.globalAlpha = 1;
   }
 
-  private drawCar(variant: number) {
+  private drawCar(ox: number, oy: number) {
     const ctx = this.ctx;
+    const S = this.S;
     const { x, y, a, steer } = this.car;
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.fillStyle = "rgba(51, 51, 58, 0.16)";
+    ctx.setTransform(S, 0, 0, S, ox + S * x, oy + S * y);
+    ctx.fillStyle = "rgba(24, 48, 44, 0.3)";
     ctx.beginPath();
-    ctx.ellipse(5, 9, 32, 17, a, 0, Math.PI * 2);
+    ctx.ellipse(6, 10, 34, 18, a, 0, Math.PI * 2);
     ctx.fill();
     ctx.rotate(a);
-    ctx.fillStyle = "#3d3d44";
-    for (const [wx, wy, front] of [[17, -16, 1], [17, 16, 1], [-16, -16, 0], [-16, 16, 0]] as const) {
+    ctx.fillStyle = "#2f2f35";
+    for (const [wx, wy, front] of [[18, -17, 1], [18, 17, 1], [-17, -17, 0], [-17, 17, 0]] as const) {
       ctx.save();
       ctx.translate(wx, wy);
       if (front) ctx.rotate(steer * 0.45);
-      ctx.fillRect(-7, -3.5, 14, 7);
+      ctx.beginPath();
+      ctx.roundRect(-7.5, -4, 15, 8, 3);
+      ctx.fill();
       ctx.restore();
     }
-    ctx.drawImage(this.carSprite(variant), -38, -26, 76, 52);
-    ctx.restore();
+    ctx.drawImage(this.sprite("car", CAR_BOX, paintCar), -CAR_BOX.ax, -CAR_BOX.ay, CAR_BOX.w, CAR_BOX.h);
+  }
+
+  private drawButterflies(left: number, top: number, vw: number, vh: number) {
+    if (this.quality || this.reduced) return;
+    const ctx = this.ctx;
+    for (const b of this.butterflies) {
+      if (b.x < left || b.x > left + vw || b.y < top || b.y > top + vh) continue;
+      const flap = Math.abs(Math.sin(this.t * 14 + b.phase));
+      const by = b.y - 30 - Math.sin(this.t * 2 + b.phase) * 6;
+      ctx.fillStyle = "rgba(24,48,44,0.15)";
+      ctx.beginPath();
+      ctx.ellipse(b.x, b.y, 4, 1.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = b.color;
+      for (const s of [-1, 1]) {
+        ctx.beginPath();
+        ctx.ellipse(b.x + s * 4 * flap, by, 4.5 * flap + 0.8, 3.5, s * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = "#3a2f2a";
+      ctx.fillRect(b.x - 0.8, by - 3, 1.6, 6);
+    }
+  }
+
+  private drawCloudShadows(left: number, top: number, vw: number, vh: number) {
+    const ctx = this.ctx;
+    for (let k = 0; k < 3; k++) {
+      const cx = ((this.t * 14 + k * 1500) % (WORLD_W + 1200)) - 600;
+      const cy = 400 + k * 800 + Math.sin(this.t * 0.05 + k) * 120;
+      const rad = 420 + k * 60;
+      if (cx + rad * 1.4 < left || cx - rad * 1.4 > left + vw || cy + rad < top || cy - rad > top + vh) continue;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(1.4, 0.8);
+      const g = ctx.createRadialGradient(0, 0, 20, 0, 0, rad);
+      g.addColorStop(0, "rgba(30, 55, 70, 0.11)");
+      g.addColorStop(1, "rgba(30, 55, 70, 0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(-rad, -rad, rad * 2, rad * 2);
+      ctx.restore();
+    }
   }
 
   private drawParticles() {
     const ctx = this.ctx;
     for (const p of this.particles) {
       const k = p.life / p.max;
-      ctx.globalAlpha = 1 - k;
+      ctx.globalAlpha = p.kind === "debris" ? Math.min(1, (1 - k) * 3) : 1 - k;
       switch (p.kind) {
         case "dust":
-          ctx.strokeStyle = p.color;
-          ctx.lineWidth = 1.2;
+          ctx.fillStyle = p.color;
           ctx.beginPath();
           ctx.arc(p.x, p.y, p.size * (1 + k * 1.5), 0, Math.PI * 2);
-          ctx.stroke();
+          ctx.fill();
           break;
         case "ripple":
           ctx.strokeStyle = p.color;
-          ctx.lineWidth = 1.2;
+          ctx.lineWidth = 1.5;
           ctx.beginPath();
           ctx.ellipse(p.x, p.y, p.size + k * 40, (p.size + k * 40) * 0.45, 0, 0, Math.PI * 2);
           ctx.stroke();
           break;
         case "leaf":
-          ctx.save();
-          ctx.translate(p.x, p.y);
-          ctx.rotate(p.rot);
-          ctx.strokeStyle = p.color;
-          ctx.fillStyle = PAPER;
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.ellipse(0, 0, p.size, p.size * 0.5, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-          ctx.restore();
-          break;
+        case "debris":
         case "confetti":
           ctx.save();
-          ctx.translate(p.x, p.y);
+          ctx.translate(p.x, p.y - p.z);
           ctx.rotate(p.rot);
           ctx.fillStyle = p.color;
-          ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+          if (p.kind === "leaf") {
+            ctx.beginPath();
+            ctx.ellipse(0, 0, p.size, p.size * 0.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+          } else ctx.fillRect(-p.size / 2, -p.size / 3, p.size, (p.size * 2) / 3);
           ctx.restore();
           break;
+        case "sparkle": {
+          const s = p.size * (1 - k * 0.5);
+          const sx = p.x;
+          const sy = p.y - p.z;
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy - s * 1.6);
+          ctx.lineTo(sx + s * 0.4, sy - s * 0.4);
+          ctx.lineTo(sx + s * 1.6, sy);
+          ctx.lineTo(sx + s * 0.4, sy + s * 0.4);
+          ctx.lineTo(sx, sy + s * 1.6);
+          ctx.lineTo(sx - s * 0.4, sy + s * 0.4);
+          ctx.lineTo(sx - s * 1.6, sy);
+          ctx.lineTo(sx - s * 0.4, sy - s * 0.4);
+          ctx.closePath();
+          ctx.fill();
+          break;
+        }
         case "text":
-          handText(ctx, p.text ?? "", p.x, p.y, p.size, p.color, { rot: p.rot, alpha: 1 - k * k });
+          text(ctx, p.text ?? "", p.x, p.y, p.size, p.color, { alpha: 1 - k * k, rot: p.rot, weight: 900, shadow: "rgba(255,255,255,0.8)" });
           break;
       }
     }
     ctx.globalAlpha = 1;
   }
 }
-
