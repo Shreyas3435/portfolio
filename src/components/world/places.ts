@@ -8,7 +8,9 @@ export const SPAWN = { x: 1700, y: 1395, angle: -Math.PI / 2 };
 
 /** The big knock-over-able name north of the plaza. */
 export const NAME = { text: "SHREYAS ALVA", x: 1700, y: 1060, advance: 66 };
-export const TAGLINE = { text: "Full-Stack × AI Engineer · Open to work & collaboration", x: 1700, y: 1160 };
+export const TAGLINE = { text: "FULL-STACK × AI ENGINEER  //  OPEN TO WORK & COLLABORATION", x: 1700, y: 1160 };
+/** The railway along the south edge; a train runs along it every so often. */
+export const TRACK_Y = WORLD_H - 150;
 
 export type PlaceKind = "project" | "workshop" | "about" | "skills" | "social";
 
@@ -45,41 +47,41 @@ export interface District {
   blurb: string;
   color: string;
   gate: { x: number; y: number };
-  court: { x: number; y: number; rx: number; ry: number; surface: "stone" | "meadow" | "sand" };
+  court: { x: number; y: number; rx: number; ry: number; surface: "stone" | "meadow" | "court" };
 }
 
 export const districts: District[] = [
   {
     id: "projects",
     name: "Projects",
-    blurb: "Flagship builds behind the temple gate",
-    color: "#e8601c",
+    blurb: "Flagship builds around the fountain plaza",
+    color: "#ff6d00",
     gate: { x: 1700, y: 870 },
     court: { x: 1700, y: 560, rx: 690, ry: 265, surface: "stone" },
   },
   {
     id: "connections",
     name: "Connections",
-    blurb: "Bazaar street: GitHub, LinkedIn, post office, xerox shop",
-    color: "#1565c0",
+    blurb: "GitHub, LinkedIn, the post office and the print shop",
+    color: "#2979ff",
     gate: { x: 2810, y: 1560 },
     court: { x: 2810, y: 1300, rx: 470, ry: 215, surface: "stone" },
   },
   {
     id: "home",
     name: "Home",
-    blurb: "About me and the banyan skill tree",
-    color: "#d4a017",
+    blurb: "About me and the spirit tree of skills",
+    color: "#00bfa5",
     gate: { x: 780, y: 1560 },
     court: { x: 780, y: 1290, rx: 430, ry: 225, surface: "meadow" },
   },
   {
     id: "playground",
-    name: "Gully Cricket",
-    blurb: "Knock the stumps — everything rebuilds",
-    color: "#2e7d32",
+    name: "The Court",
+    blurb: "Street court: smash the cones, sink the ball",
+    color: "#ffab00",
     gate: { x: 1700, y: 1790 },
-    court: { x: 1700, y: 2070, rx: 560, ry: 255, surface: "sand" },
+    court: { x: 1700, y: 2070, rx: 560, ry: 255, surface: "court" },
   },
 ];
 
@@ -101,8 +103,8 @@ export const places: Place[] = [
     district: "projects",
     title: "ShadowPath",
     subtitle: "Automated repository attack-surface analysis",
-    color: "#e5484d",
-    ink: "#b4232c",
+    color: "#ff3b30",
+    ink: "#c4161c",
     x: 1080,
     y: 560,
     box: projectBox(320, 500, 420),
@@ -115,8 +117,8 @@ export const places: Place[] = [
     district: "projects",
     title: "Product Search",
     subtitle: "Constraint-aware search for industrial parts",
-    color: "#f0a020",
-    ink: "#9a5800",
+    color: "#ffab00",
+    ink: "#a86400",
     x: 1390,
     y: 390,
     box: projectBox(400, 420, 340),
@@ -129,8 +131,8 @@ export const places: Place[] = [
     district: "projects",
     title: "The Workshop",
     subtitle: "Side builds, spikes and a security lab",
-    color: "#455a64",
-    ink: "#263238",
+    color: "#546e7a",
+    ink: "#2e3d45",
     x: 1700,
     y: 270,
     box: projectBox(340, 360, 290),
@@ -142,8 +144,8 @@ export const places: Place[] = [
     district: "projects",
     title: "Content Search",
     subtitle: "Semantic search over any website",
-    color: "#3e8bff",
-    ink: "#1d58b8",
+    color: "#2979ff",
+    ink: "#1446b8",
     x: 2010,
     y: 390,
     box: projectBox(400, 440, 360),
@@ -156,8 +158,8 @@ export const places: Place[] = [
     district: "projects",
     title: "Trek Saathi",
     subtitle: "Discovery & booking for Indian treks",
-    color: "#2f9e62",
-    ink: "#1a6e45",
+    color: "#00c853",
+    ink: "#007a33",
     x: 2320,
     y: 560,
     box: projectBox(600, 460, 380),
@@ -172,8 +174,8 @@ export const places: Place[] = [
     district: "home",
     title: "About me",
     subtitle: "Who I am and how I work",
-    color: "#c4501c",
-    ink: "#8a3410",
+    color: "#ff6d00",
+    ink: "#b34700",
     x: 560,
     y: 1150,
     box: projectBox(360, 380, 300),
@@ -184,9 +186,9 @@ export const places: Place[] = [
     kind: "skills",
     district: "home",
     title: "Skill Tree",
-    subtitle: "The banyan: what I'm strong at, and what I'm growing",
-    color: "#00897b",
-    ink: "#00574d",
+    subtitle: "The spirit tree: what I'm strong at, and what's growing",
+    color: "#00bfa5",
+    ink: "#00796b",
     x: 1010,
     y: 1140,
     box: projectBox(380, 470, 400),
@@ -196,10 +198,10 @@ export const places: Place[] = [
   // --- Connections district --------------------------------------------------
   ...(
     [
-      ["github", "GitHub", `Cyber café · @${profile.githubHandle}`, "#263238", "#111a1f", profile.github, "Open GitHub"],
-      ["linkedin", "LinkedIn", "The office · let's connect", "#0a66c2", "#084a8c", profile.linkedin, "Open LinkedIn"],
-      ["email", "Email", `India Post · ${profile.email}`, "#d32f2f", "#9a1b1b", `mailto:${profile.email}`, "Write an email"],
-      ["resume", "Résumé", "Xerox & print · one-page PDF", "#f9a825", "#8a5a00", profile.resumeUrl, "Download résumé"],
+      ["github", "GitHub", `Code Mart · @${profile.githubHandle}`, "#00c853", "#007a33", profile.github, "Open GitHub"],
+      ["linkedin", "LinkedIn", "The office tower · let's connect", "#0a66c2", "#084a8c", profile.linkedin, "Open LinkedIn"],
+      ["email", "Email", `Post office · ${profile.email}`, "#e53935", "#a31515", `mailto:${profile.email}`, "Write an email"],
+      ["resume", "Résumé", "Print shop · one-page PDF", "#ffc400", "#8a6400", profile.resumeUrl, "Download résumé"],
     ] as const
   ).map(([id, title, subtitle, color, ink, href, hrefLabel], i) =>
     place({
@@ -237,12 +239,13 @@ export const PONDS = [
   { x: 900, y: 2190, rx: 150, ry: 80 },
 ];
 
-export type DecorKind = "tank" | "campfire" | "signpost";
+export type DecorKind = "fountain" | "campfire" | "signpost";
 export const DECOR: { kind: DecorKind; x: number; y: number; r: number }[] = [
-  { kind: "tank", x: 1700, y: 610, r: 62 },
-  { kind: "campfire", x: 790, y: 1360, r: 28 },
+  { kind: "fountain", x: 1700, y: 610, r: 62 },
+  { kind: "campfire", x: 790, y: 1290, r: 28 },
   { kind: "signpost", x: 1500, y: 1470, r: 10 },
 ];
 
-/** Cricket pitch in the playground: stumps at both ends. */
-export const PITCH = { x: 1640, y: 2060, half: 150 };
+/** Street basketball court: hoops at both ends, a cone pyramid to the side. */
+export const COURT = { x: 1700, y: 2060, half: 230 };
+export const CONES = { x: 1700, y: 1950 };

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, Check, Compass, Copy, HelpCircle, Map as MapIcon, RotateCcw, ScrollText, X } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Check, Compass, Copy, HelpCircle, Map as MapIcon, Moon, RotateCcw, ScrollText, Sun, X } from "lucide-react";
 import { profile } from "@/data/profile";
 import { getProjectBySlug, labProjects, secondaryProjects } from "@/data/projects";
 import { skills } from "@/data/skills";
@@ -16,6 +16,18 @@ type View = "world" | "page";
 const noopSubscribe = () => () => {};
 const urlView = (): View => (new URLSearchParams(window.location.search).get("view") === "page" ? "page" : "world");
 const isTouch = () => window.matchMedia("(pointer: coarse)").matches;
+const MODE_KEY = "world-mode";
+/** Saved preference, otherwise follow the visitor's clock. */
+const prefersNight = () => {
+  try {
+    const saved = localStorage.getItem(MODE_KEY);
+    if (saved) return saved === "night";
+  } catch {
+    // Storage can be unavailable (private mode); fall back to the clock.
+  }
+  const h = new Date().getHours();
+  return h >= 19 || h < 6;
+};
 
 const statusLabel: Record<string, string> = {
   shipped: "Shipped",
@@ -37,6 +49,9 @@ export function PortfolioWorld() {
   const initialView = useSyncExternalStore(noopSubscribe, urlView, () => "world" as View);
   const [chosenView, setView] = useState<View | null>(null);
   const view = chosenView ?? initialView;
+  const initialNight = useSyncExternalStore(noopSubscribe, prefersNight, () => false);
+  const [chosenNight, setNight] = useState<boolean | null>(null);
+  const night = chosenNight ?? initialNight;
   const [pageClosing, setPageClosing] = useState(false);
 
   useEffect(() => {
@@ -55,6 +70,19 @@ export function PortfolioWorld() {
     engineRef.current = engine;
     return () => engine.destroy();
   }, []);
+
+  useEffect(() => {
+    engineRef.current?.setNight(night);
+  }, [night, ready]);
+
+  const toggleNight = useCallback(() => {
+    setNight(!night);
+    try {
+      localStorage.setItem(MODE_KEY, night ? "day" : "night");
+    } catch {
+      // Not persisted; fine.
+    }
+  }, [night]);
 
   const pageShown = view === "page" && !pageClosing;
   useEffect(() => {
@@ -127,12 +155,12 @@ export function PortfolioWorld() {
   const inWorld = view === "world";
 
   return (
-    <div className="world-root fixed inset-0 overflow-hidden select-none">
+    <div className="world-root fixed inset-0 overflow-hidden select-none" data-mode={night ? "night" : "day"}>
       <canvas
         ref={canvasRef}
         className="absolute inset-0 h-full w-full touch-none"
         style={{ cursor: "grab" }}
-        aria-label="A painted, drivable world of Shreyas Alva's work. Drive the auto-rickshaw to visit projects, or switch to the page view."
+        aria-label="A painted, drivable world of Shreyas Alva's work. Drive the jeep to visit projects, or switch to the page view."
         role="img"
       />
       <div className="world-light pointer-events-none absolute inset-0" />
@@ -154,6 +182,9 @@ export function PortfolioWorld() {
               <ScrollText size={15} /> Page
             </button>
           </div>
+          <button type="button" onClick={toggleNight} className="wv-btn wv-icon" aria-label={night ? "Switch to day" : "Switch to night"} title={night ? "Day mode" : "Night mode"}>
+            {night ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
           {inWorld && (
             <>
               <button type="button" onClick={() => setMapOpen(true)} className="wv-btn wv-icon" aria-label="Open map">
@@ -178,7 +209,7 @@ export function PortfolioWorld() {
             )}
           >
             <div className="wv-card pointer-events-auto max-w-xs px-4 py-3 text-sm">
-              <p className="font-display text-xl leading-tight">Take the auto for a spin</p>
+              <p className="font-display text-xl leading-tight font-bold">Take the jeep for a spin</p>
               {touch ? (
                 <ul className="mt-1.5 space-y-1 text-[13px] text-[var(--ink-soft)]">
                   <li>Hold and drag to drive toward your finger</li>
@@ -221,7 +252,7 @@ export function PortfolioWorld() {
         </>
       )}
 
-      {view === "page" && <PageView closing={pageClosing} onExplore={() => switchView("world")} />}
+      {view === "page" && <PageView closing={pageClosing} night={night} onExplore={() => switchView("world")} />}
 
       <div
         className={cn(
@@ -231,7 +262,7 @@ export function PortfolioWorld() {
         aria-hidden={ready}
       >
         <div className="world-loader" aria-hidden />
-        <p className="font-display text-2xl font-semibold">Building the world…</p>
+        <p className="font-display text-2xl font-bold">Loading the city…</p>
       </div>
     </div>
   );
@@ -515,7 +546,7 @@ function AboutDetail({ place }: { place: Place }) {
 
 function SkillsDetail({ place }: { place: Place }) {
   const cats = [
-    ["ai", "AI & Search", "#00897b"],
+    ["ai", "AI & Search", "#00bfa5"],
     ["fullstack", "Full-Stack", "#3e8bff"],
     ["security", "Security", "#e5484d"],
     ["systems", "Systems & Data", "#2f9e62"],

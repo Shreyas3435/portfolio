@@ -20,37 +20,35 @@ export function mulberry32(seed: number): Rand {
 export const range = (r: Rand, min: number, max: number) => min + (max - min) * r();
 export const pick = <T,>(r: Rand, list: readonly T[]) => list[Math.floor(r() * list.length)];
 
-// Vivid coastal-Karnataka palette.
+// Clean, saturated anime-city palette.
 export const C = {
-  grass: "#5fae47",
-  grassLight: "#9bd65c",
-  grassDark: "#3f8a3a",
-  grassDeep: "#2a6334",
-  path: "#c8784a",
-  pathDark: "#9c5532",
-  pathLight: "#e09a68",
-  stone: "#d8cfbd",
-  stoneDark: "#a99d86",
-  water: "#1e9ccf",
-  waterDeep: "#0d6fa3",
-  waterLight: "#7fd8f2",
-  shadow: "rgba(20, 40, 60, 0.32)",
-  ink: "#22272b",
-  cream: "#fff6e2",
-  wood: "#9a6236",
-  woodDark: "#6a3f20",
-  warmLight: "#ffcf6a",
-  saffron: "#ff9933",
-  indiaGreen: "#138808",
-  marigold: "#ffa000",
+  grass: "#5cb85c",
+  grassLight: "#9be27a",
+  grassDark: "#3c8f4a",
+  grassDeep: "#2a6a45",
+  asphalt: "#4a525c",
+  asphaltDark: "#383e46",
+  sidewalk: "#d9dde3",
+  curb: "#aeb5bf",
+  stone: "#e3e6ea",
+  stoneDark: "#b4bcc6",
+  water: "#29a8e0",
+  waterDeep: "#1373b8",
+  waterLight: "#8fe0ff",
+  ink: "#1d232b",
+  cream: "#fdfbf6",
+  wood: "#a0693e",
+  woodDark: "#6b4426",
+  warmLight: "#ffd27a",
+  neonCyan: "#3df0ff",
+  neonAmber: "#ffb84d",
 } as const;
 
-let displayFamily = "serif";
+let displayFamily = "sans-serif";
 export function setDisplayFamily(family: string) {
   displayFamily = family;
 }
-// The display face ships a single heavy weight.
-export const displayFont = (size: number) => `400 ${size}px ${displayFamily}`;
+export const displayFont = (size: number, weight = 700) => `${weight} ${size}px ${displayFamily}`;
 
 /** Mix two hex colours; t = 0 gives a, t = 1 gives b. */
 export function mix(a: string, b: string, t: number) {
@@ -178,11 +176,11 @@ export function text(
   color: string,
   o: { weight?: number; italic?: boolean; align?: CanvasTextAlign; alpha?: number; rot?: number; shadow?: string } = {},
 ) {
-  const { align = "center", alpha = 1, rot = 0, shadow } = o;
+  const { weight = 700, align = "center", alpha = 1, rot = 0, shadow } = o;
   ctx.save();
   ctx.translate(x, y);
   if (rot) ctx.rotate(rot);
-  ctx.font = displayFont(size);
+  ctx.font = displayFont(size, weight);
   ctx.textAlign = align;
   ctx.textBaseline = "middle";
   ctx.globalAlpha = alpha;
@@ -195,22 +193,31 @@ export function text(
   ctx.restore();
 }
 
-/** Hand-painted Indian shop-style sign board with a contrasting frame. */
-export function board(ctx: Ctx, x: number, y: number, label: string, color: string, size = 24, textColor: string = C.cream) {
-  ctx.font = displayFont(size);
-  const w = ctx.measureText(label).width + size * 1.4;
+/** Backlit LED-style sign: dark panel, bright coloured frame and text. */
+export function board(ctx: Ctx, x: number, y: number, label: string, color: string, size = 22, textColor: string = C.cream) {
+  ctx.font = displayFont(size, 700);
+  const w = ctx.measureText(label).width + size * 1.3;
   const h = size * 1.6;
   const x0 = x - w / 2;
   const y0 = y - h / 2;
-  ctx.fillStyle = "rgba(16, 30, 40, 0.35)";
-  ctx.fillRect(x0 + 4, y0 + 5, w, h);
-  ctx.fillStyle = darken(color, 0.45);
-  ctx.fillRect(x0 - 3, y0 - 3, w + 6, h + 6);
+  ctx.fillStyle = "rgba(10, 16, 30, 0.35)";
   ctx.beginPath();
-  ctx.rect(x0, y0, w, h);
-  shade(ctx, x0, y0, x0 + w * 0.35, y0 + h, lighten(color, 0.3), color, darken(color, 0.2));
-  ctx.strokeStyle = rgba("#ffffff", 0.55);
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(x0 + 4, y0 + 4, w - 8, h - 8);
-  text(ctx, label, x, y + size * 0.06, size, textColor, { shadow: "rgba(0,0,0,0.35)" });
+  ctx.roundRect(x0 + 3, y0 + 5, w, h, 5);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.roundRect(x0, y0, w, h, 5);
+  shade(ctx, x0, y0, x0 + w * 0.4, y0 + h, "#3a4656", "#232b36", "#171d25");
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.roundRect(x0 + 2, y0 + 2, w - 4, h - 4, 4);
+  ctx.stroke();
+  text(ctx, label, x, y + 1, size, textColor === C.cream ? lighten(color, 0.55) : textColor);
+}
+
+/** Thin darker outline around the current path — keeps shapes crisp. */
+export function outline(ctx: Ctx, base: string, width = 1.4) {
+  ctx.strokeStyle = darken(base, 0.55);
+  ctx.lineWidth = width;
+  ctx.stroke();
 }

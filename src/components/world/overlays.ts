@@ -2,9 +2,9 @@ import { LANTERNS } from "./art";
 import type { DecorKind, Place } from "./places";
 import { type Ctx, C, glow, rgba, shade } from "./paint";
 
-// Per-frame animation drawn on top of cached sprites. These use plain shapes
-// only, so they stay cheap. `t` is world time in seconds; `near` is true when
-// the player is parked at the place.
+// Per-frame animation drawn on top of cached sprites. Plain shapes only, so
+// they stay cheap. `t` is world time in seconds; `near` is true while the
+// player is parked at the place.
 
 export interface OverlaySprites {
   gear: HTMLCanvasElement;
@@ -13,7 +13,7 @@ export interface OverlaySprites {
 
 function puff(ctx: Ctx, x: number, y: number, s: number, a: number) {
   ctx.globalAlpha = a;
-  ctx.fillStyle = "#fbf6ee";
+  ctx.fillStyle = "#f4f7fa";
   ctx.beginPath();
   ctx.arc(x, y, s, 0, Math.PI * 2);
   ctx.arc(x + s * 0.6, y + s * 0.2, s * 0.7, 0, Math.PI * 2);
@@ -29,26 +29,36 @@ function smoke(ctx: Ctx, x: number, y: number, t: number, n = 4) {
   }
 }
 
+function blink(ctx: Ctx, x: number, y: number, t: number, phase: number) {
+  const on = Math.sin(t * 3 + phase) > 0.4;
+  if (!on) return;
+  glow(ctx, x, y, 16, "#ff3b30", 0.8);
+  ctx.fillStyle = "#ffd0cc";
+  ctx.beginPath();
+  ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 export function drawPlaceOverlay(ctx: Ctx, p: Place, t: number, s: OverlaySprites, near: boolean) {
   const { x, y } = p;
   switch (p.id) {
     case "shadowpath": {
-      const lx = x;
-      const ly = y - 342;
-      const a = t * 0.8;
-      ctx.save();
-      ctx.translate(lx, ly);
-      ctx.scale(1, 0.45);
-      const g = ctx.createRadialGradient(0, 0, 8, 0, 0, 340);
-      g.addColorStop(0, "rgba(255, 226, 150, 0.55)");
-      g.addColorStop(1, "rgba(255, 226, 150, 0)");
-      ctx.fillStyle = g;
+      // Rotating radar dish on the cabin roof + aviation lights.
+      const a = t * 1.6;
+      const cx = x;
+      const cy = y - 356;
+      const w = Math.cos(a) * 26;
+      ctx.fillStyle = "#5f6873";
+      ctx.fillRect(cx - 2, cy, 4, 10);
       ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.arc(0, 0, 340, a - 0.2, a + 0.2);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
+      ctx.ellipse(cx, cy - 6, Math.max(2, Math.abs(w)), 12, 0, 0, Math.PI * 2);
+      shade(ctx, cx - 26, cy - 18, cx + 26, cy + 6, "#ffffff", "#d3d9e0", "#8a939e");
+      ctx.strokeStyle = "#5f6873";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      blink(ctx, x, y - 404, t, 0);
+      blink(ctx, x - 46, y - 300, t, 1.5);
+      blink(ctx, x + 46, y - 300, t, 1.5);
       for (let k = 0; k < 2; k++) {
         const ph = (t * 0.4 + k * 0.5) % 1;
         ctx.strokeStyle = p.color;
@@ -73,7 +83,7 @@ export function drawPlaceOverlay(ctx: Ctx, p: Place, t: number, s: OverlaySprite
     case "trek-saathi": {
       const fx = x - 176;
       const fy = y - 40;
-      ctx.strokeStyle = "#5e3f29";
+      ctx.strokeStyle = "#3a2410";
       ctx.lineWidth = 2.5;
       ctx.beginPath();
       ctx.moveTo(fx, fy);
@@ -92,20 +102,6 @@ export function drawPlaceOverlay(ctx: Ctx, p: Place, t: number, s: OverlaySprite
       ctx.closePath();
       ctx.fillStyle = p.color;
       ctx.fill();
-      // Birds over the peaks.
-      ctx.strokeStyle = "#2c3a36";
-      ctx.lineWidth = 1.8;
-      for (let k = 0; k < 3; k++) {
-        const a = t * 0.45 + k * 2.1;
-        const bx = x + Math.cos(a) * 160;
-        const by = y - 330 + Math.sin(a) * 24;
-        const flap = Math.sin(t * 8 + k) * 5;
-        ctx.beginPath();
-        ctx.moveTo(bx - 10, by - flap);
-        ctx.quadraticCurveTo(bx - 4, by - 4, bx, by);
-        ctx.quadraticCurveTo(bx + 4, by - 4, bx + 10, by - flap);
-        ctx.stroke();
-      }
       break;
     }
     case "website-content-search": {
@@ -117,11 +113,11 @@ export function drawPlaceOverlay(ctx: Ctx, p: Place, t: number, s: OverlaySprite
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(Math.sin(t + k) * 0.2);
-        ctx.fillStyle = "rgba(20,40,60,0.18)";
+        ctx.fillStyle = "rgba(20,40,60,0.2)";
         ctx.fillRect(-17, -11, 38, 26);
-        ctx.fillStyle = "#fffaf0";
+        ctx.fillStyle = "#ffffff";
         ctx.fillRect(-19, -13, 38, 26);
-        ctx.fillStyle = rgba(p.color, 0.6);
+        ctx.fillStyle = rgba(p.color, 0.7);
         for (let l = 0; l < 3; l++) ctx.fillRect(-13, -6 + l * 7, 24 - l * 5, 2.5);
         ctx.restore();
       }
@@ -135,56 +131,39 @@ export function drawPlaceOverlay(ctx: Ctx, p: Place, t: number, s: OverlaySprite
       break;
     }
     case "workshop": {
-      ctx.save();
-      ctx.translate(x - 70, y - 152);
-      ctx.rotate(Math.sin(t * 1.6) * 0.22);
-      ctx.strokeStyle = "#2c3a36";
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(0, 24);
-      ctx.stroke();
-      glow(ctx, 0, 32, 40, C.warmLight, 0.65);
-      ctx.fillStyle = "#fff0b3";
-      ctx.beginPath();
-      ctx.arc(0, 32, 7, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
+      const on = Math.sin(t * 17) > -0.85;
+      if (on) glow(ctx, x, y - 132, 70, C.neonCyan, 0.35);
       break;
     }
     case "about":
-      smoke(ctx, x + 63, y - 218, t, 3);
+      smoke(ctx, x + 61, y - 266, t, 3);
       break;
     case "skills":
       for (let i = 0; i < LANTERNS.length; i++) {
         const [lx, ly, c] = LANTERNS[i];
         const pulse = 0.55 + Math.sin(t * 2.2 + i * 1.3) * 0.25 + (near ? 0.25 : 0);
-        const sway = Math.sin(t * 1.4 + i) * 2;
-        glow(ctx, x + lx + sway, y + ly, 26 + pulse * 10, c, pulse * 0.7);
-        ctx.fillStyle = c;
+        const bob = Math.sin(t * 1.4 + i) * 4;
+        glow(ctx, x + lx, y + ly + bob, 26 + pulse * 10, c, pulse * 0.7);
+        ctx.fillStyle = "#ffffff";
         ctx.beginPath();
-        ctx.ellipse(x + lx + sway, y + ly, 6, 8, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "rgba(255,255,255,0.7)";
-        ctx.beginPath();
-        ctx.arc(x + lx + sway - 2, y + ly - 3, 2, 0, Math.PI * 2);
+        ctx.arc(x + lx, y + ly + bob, 4.5, 0, Math.PI * 2);
         ctx.fill();
       }
       break;
     case "github": {
-      const flick = Math.sin(t * 13) > 0.92 ? 0.15 : 0.45;
-      glow(ctx, x, y - 104, 60, "#4ade80", flick);
+      const flick = Math.sin(t * 13) > 0.92 ? 0.12 : 0.35;
+      glow(ctx, x, y - 117, 70, "#00e676", flick);
       break;
     }
     case "email": {
       const ex = x + Math.sin(t * 1.2) * 30;
-      const ey = y - 200 + Math.sin(t * 2.3) * 8;
+      const ey = y - 196 + Math.sin(t * 2.3) * 8;
       ctx.save();
       ctx.translate(ex, ey);
       ctx.rotate(Math.sin(t * 1.7) * 0.2);
-      ctx.fillStyle = "rgba(20,40,60,0.18)";
+      ctx.fillStyle = "rgba(20,40,60,0.2)";
       ctx.fillRect(-14, -8, 32, 20);
-      ctx.fillStyle = "#fffaf0";
+      ctx.fillStyle = "#ffffff";
       ctx.fillRect(-16, -10, 32, 20);
       ctx.strokeStyle = p.color;
       ctx.lineWidth = 2;
@@ -201,7 +180,7 @@ export function drawPlaceOverlay(ctx: Ctx, p: Place, t: number, s: OverlaySprite
     const [fx, fy] = p.front;
     const s2 = 1 + Math.sin(t * 4) * 0.05;
     glow(ctx, fx, fy, 70, p.color, 0.25);
-    ctx.strokeStyle = rgba(p.color, 0.85);
+    ctx.strokeStyle = rgba(p.color, 0.9);
     ctx.lineWidth = 3;
     ctx.setLineDash([12, 10]);
     ctx.lineDashOffset = -t * 30;
@@ -213,35 +192,30 @@ export function drawPlaceOverlay(ctx: Ctx, p: Place, t: number, s: OverlaySprite
 }
 
 export function drawDecorOverlay(ctx: Ctx, kind: DecorKind, x: number, y: number, t: number) {
-  if (kind === "tank") {
-    // Ripples and glints on the temple tank.
-    for (let k = 0; k < 3; k++) {
-      const ph = (t * 0.5 + k / 3) % 1;
-      ctx.strokeStyle = `rgba(255,255,255,${(1 - ph) * 0.7})`;
-      ctx.lineWidth = 1.5;
+  if (kind === "fountain") {
+    ctx.strokeStyle = "rgba(225, 248, 255, 0.9)";
+    ctx.lineWidth = 2.5;
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2 + t * 0.3;
+      const dx = Math.cos(a) * 58;
+      const dy = Math.sin(a) * 22;
       ctx.beginPath();
-      ctx.ellipse(x + (k - 1) * 14, y + (k % 2) * 6, 6 + ph * 22, (6 + ph * 22) * 0.45, 0, 0, Math.PI * 2);
+      ctx.moveTo(x, y - 74);
+      ctx.quadraticCurveTo(x + dx * 0.5, y - 104, x + dx, y - 6 + dy);
       ctx.stroke();
     }
-    ctx.fillStyle = "#ffffff";
-    for (let k = 0; k < 4; k++) {
-      const a = Math.max(0, Math.sin(t * 2.4 + k * 1.9));
-      ctx.globalAlpha = a;
-      const gx = x - 30 + k * 20;
-      const gy = y - 10 + (k % 2) * 16;
+    for (let k = 0; k < 3; k++) {
+      const ph = (t * 0.6 + k / 3) % 1;
+      ctx.strokeStyle = `rgba(255,255,255,${(1 - ph) * 0.6})`;
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(gx - 6, gy);
-      ctx.lineTo(gx, gy - 1.5);
-      ctx.lineTo(gx + 6, gy);
-      ctx.lineTo(gx, gy + 1.5);
-      ctx.closePath();
-      ctx.fill();
+      ctx.ellipse(x, y - 4, 20 + ph * 50, (20 + ph * 50) * 0.38, 0, 0, Math.PI * 2);
+      ctx.stroke();
     }
-    ctx.globalAlpha = 1;
   } else if (kind === "campfire") {
     const flick = (k: number) => 0.85 + Math.sin(t * 11 + k * 1.7) * 0.1 + Math.sin(t * 17 + k) * 0.06;
     glow(ctx, x, y - 20, 90, "#ffb347", 0.3 + Math.sin(t * 9) * 0.04);
-    const flames: [string, number, number][] = [["#ff6a2a", 22, 0], ["#ffa53a", 15, 1], ["#ffe08a", 9, 2]];
+    const flames: [string, number, number][] = [["#ff5a1f", 22, 0], ["#ffa53a", 15, 1], ["#ffe08a", 9, 2]];
     for (const [c, h, k] of flames) {
       const fh = h * 2.2 * flick(k);
       const fx = x + Math.sin(t * 6 + k) * 2;
@@ -277,23 +251,17 @@ export function makeOverlaySprites(scale: number): OverlaySprites {
       g.lineTo(Math.cos(a1) * rad, Math.sin(a1) * rad);
     }
     g.closePath();
-    shade(g, -56, -56, 56, 56, "#ffd37a", "#e09a28", "#9a5f0e");
-    g.fillStyle = "#5b6b69";
+    shade(g, -56, -56, 56, 56, "#ffd37a", "#ffab00", "#a86400");
+    g.strokeStyle = "#7a4a00";
+    g.lineWidth = 1.5;
+    g.stroke();
+    g.fillStyle = "#4a525c";
     g.beginPath();
     g.arc(0, 0, 14, 0, Math.PI * 2);
     g.fill();
-    g.strokeStyle = "rgba(90,50,10,0.5)";
-    g.lineWidth = 5;
-    for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * Math.PI * 2;
-      g.beginPath();
-      g.moveTo(Math.cos(a) * 18, Math.sin(a) * 18);
-      g.lineTo(Math.cos(a) * 38, Math.sin(a) * 38);
-      g.stroke();
-    }
   });
   const magnifier = mk(100, (g) => {
-    g.strokeStyle = "#7a5233";
+    g.strokeStyle = "#38424f";
     g.lineWidth = 9;
     g.lineCap = "round";
     g.beginPath();
@@ -301,13 +269,13 @@ export function makeOverlaySprites(scale: number): OverlaySprites {
     g.lineTo(42, 42);
     g.stroke();
     const lens = g.createRadialGradient(-14, -14, 2, -6, -6, 32);
-    lens.addColorStop(0, "rgba(255,255,255,0.85)");
-    lens.addColorStop(1, "rgba(160,215,255,0.45)");
+    lens.addColorStop(0, "rgba(255,255,255,0.9)");
+    lens.addColorStop(1, "rgba(140,210,255,0.5)");
     g.fillStyle = lens;
     g.beginPath();
     g.arc(-6, -6, 30, 0, Math.PI * 2);
     g.fill();
-    g.strokeStyle = "#d9a441";
+    g.strokeStyle = "#2979ff";
     g.lineWidth = 6;
     g.stroke();
   });

@@ -13,7 +13,7 @@ import { placeById } from "./places";
 const levelLabel = { core: "Core", strong: "Strong", working: "Working", exploring: "Exploring" } as const;
 const levelDots = { core: 4, strong: 3, working: 2, exploring: 1 } as const;
 const categoryInfo = {
-  ai: { label: "AI & Search", color: "#00897b" },
+  ai: { label: "AI & Search", color: "#00bfa5" },
   fullstack: { label: "Full-Stack", color: "#3e8bff" },
   security: { label: "Security", color: "#e5484d" },
   systems: { label: "Systems & Data", color: "#2f9e62" },
@@ -26,7 +26,7 @@ const statusLabel: Record<string, string> = {
 };
 
 /** The "rolled-down scroll" view: everything on one readable page. */
-export function PageView({ closing, onExplore }: { closing: boolean; onExplore: () => void }) {
+export function PageView({ closing, night, onExplore }: { closing: boolean; night: boolean; onExplore: () => void }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     scrollRef.current?.focus({ preventScroll: true });
@@ -35,7 +35,7 @@ export function PageView({ closing, onExplore }: { closing: boolean; onExplore: 
   return (
     <div className={`pv-root ${closing ? "pv-closing" : ""}`} role="region" aria-label="Portfolio page">
       <div ref={scrollRef} tabIndex={-1} className="pv-scroll h-full overflow-y-auto overscroll-contain outline-none">
-        <Hero onExplore={onExplore} />
+        <Hero night={night} onExplore={onExplore} />
         <main className="pv-paper mx-auto max-w-5xl px-5 pb-24 sm:px-10">
           <Intro />
           <Projects />
@@ -50,53 +50,19 @@ export function PageView({ closing, onExplore }: { closing: boolean; onExplore: 
   );
 }
 
-function Hero({ onExplore }: { onExplore: () => void }) {
+function Hero({ night, onExplore }: { night: boolean; onExplore: () => void }) {
   return (
     <header className="pv-hero relative overflow-hidden">
-      <svg className="absolute inset-0 h-full w-full" viewBox="0 0 1440 560" preserveAspectRatio="xMidYMax slice" aria-hidden>
-        <defs>
-          <linearGradient id="pv-sky" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#5fb7e8" />
-            <stop offset="0.5" stopColor="#ffd08a" />
-            <stop offset="1" stopColor="#ff9a4d" />
-          </linearGradient>
-          <radialGradient id="pv-sun" cx="0.74" cy="0.5" r="0.3">
-            <stop offset="0" stopColor="#fff3c4" />
-            <stop offset="0.25" stopColor="#ffd27a" stopOpacity="0.9" />
-            <stop offset="1" stopColor="#ffd27a" stopOpacity="0" />
-          </radialGradient>
-        </defs>
-        <rect width="1440" height="560" fill="url(#pv-sky)" />
-        <rect width="1440" height="560" fill="url(#pv-sun)" />
-        <circle cx="1065" cy="285" r="58" fill="#fff4cc" />
-        <path d="M0 360 L120 300 L230 340 L360 250 L470 320 L600 270 L720 330 L860 240 L980 310 L1100 260 L1240 320 L1340 280 L1440 310 V560 H0 Z" fill="#3f8f8a" opacity="0.75" />
-        <path d="M0 410 L160 360 L300 395 L450 340 L610 395 L760 350 L920 400 L1080 355 L1240 400 L1440 370 V560 H0 Z" fill="#2c7a5a" />
-        {/* Gopuram silhouette */}
-        <path d="M1150 470 V420 H1162 V392 H1172 V366 H1182 V342 H1192 V322 H1218 V342 H1228 V366 H1238 V392 H1248 V420 H1260 V470 Z" fill="#7a3a16" opacity="0.85" />
-        <path d="M0 470 C 240 440, 480 460, 720 450 S 1180 430, 1440 460 V560 H0 Z" fill="#3f8a3a" />
-        <path d="M0 510 C 300 490, 640 505, 900 495 S 1300 490, 1440 505 V560 H0 Z" fill="#2a6334" />
-        {/* Coconut palms */}
-        {[[70, 500, 1], [150, 505, 0.8], [1330, 490, 1.1], [1400, 500, 0.85]].map(([x, y, k]) => (
-          <g key={`${x}-${y}`} fill="#173f20" transform={`translate(${x} ${y}) scale(${k})`}>
-            <path d="M-3 0 Q 4 -70 14 -140 L20 -140 Q 10 -70 3 0 Z" />
-            <path d="M17 -140 q -40 -10 -70 20 q 34 -26 70 -14 Z" />
-            <path d="M17 -140 q 40 -12 72 16 q -36 -22 -72 -10 Z" />
-            <path d="M17 -140 q -10 -40 -44 -54 q 30 22 40 54 Z" />
-            <path d="M17 -140 q 14 -40 50 -50 q -32 20 -44 52 Z" />
-            <path d="M17 -140 q -36 10 -54 50 q 26 -36 54 -46 Z" />
-            <path d="M17 -140 q 36 12 50 54 q -22 -38 -50 -50 Z" />
-          </g>
-        ))}
-      </svg>
+      <CitySkyline night={night} />
       <div className="relative mx-auto flex min-h-[520px] max-w-5xl flex-col justify-center px-5 pt-24 pb-28 sm:px-10">
         <p className="pv-pill w-fit">
           <span className="pv-dot" /> Open to work & collaborations
         </p>
-        <h1 className="font-display mt-5 text-6xl leading-[0.95] text-[#1f1a14] sm:text-8xl">{profile.name}</h1>
-        <p className="font-display mt-3 text-xl text-[#3a2410] sm:text-2xl">{profile.role}</p>
-        <p className="mt-5 max-w-xl text-[15px] leading-relaxed font-medium text-[#2a1c10] sm:text-base">{profile.heroLine}</p>
+        <h1 className="pv-hero-ink font-display mt-5 text-6xl leading-[0.95] font-bold sm:text-8xl">{profile.name}</h1>
+        <p className="pv-hero-ink font-display mt-3 text-xl font-semibold sm:text-2xl">{profile.role}</p>
+        <p className="pv-hero-ink mt-5 max-w-xl text-[15px] leading-relaxed font-medium sm:text-base">{profile.heroLine}</p>
         <div className="mt-7 flex flex-wrap gap-2">
-          <a href={`mailto:${profile.email}`} className="wv-btn wv-btn-solid" style={{ background: "#e8601c" }}>
+          <a href={`mailto:${profile.email}`} className="wv-btn wv-btn-solid" style={{ background: "#ff6d00" }}>
             <Mail size={16} /> Get in touch
           </a>
           <a href={profile.resumeUrl} target="_blank" rel="noreferrer noopener" className="wv-btn">
@@ -127,7 +93,7 @@ function Intro() {
   return (
     <section className="pv-section grid gap-8 sm:grid-cols-[1.4fr_1fr]">
       <div>
-        <SectionTitle eyebrow="Hello" title="What I build" color="#e8601c" />
+        <SectionTitle eyebrow="Hello" title="What I build" color="#ff6d00" />
         <p className="text-[15px] leading-relaxed">{profile.heroSupport}</p>
         <p className="mt-3 text-[15px] leading-relaxed">{profile.howIThink}</p>
         <ul className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -172,11 +138,11 @@ function Intro() {
 function Projects() {
   return (
     <section className="pv-section">
-      <SectionTitle eyebrow="Flagship work" title="Projects" color="#e8601c" />
+      <SectionTitle eyebrow="Flagship work" title="Projects" color="#ff6d00" />
       <div className="grid gap-5 md:grid-cols-2">
         {flagshipProjects.map((p) => {
           const place = placeById(p.id);
-          const color = place?.color ?? "#e8601c";
+          const color = place?.color ?? "#ff6d00";
           const ink = place?.ink ?? "#2c3a36";
           return (
             <article key={p.id} className="pv-card pv-project flex flex-col overflow-hidden" style={{ ["--c" as string]: color }}>
@@ -269,7 +235,7 @@ function Skills() {
   const cats = Object.keys(categoryInfo) as (keyof typeof categoryInfo)[];
   return (
     <section className="pv-section">
-      <SectionTitle eyebrow="The skill tree" title="What I work with" color="#00897b" />
+      <SectionTitle eyebrow="The skill tree" title="What I work with" color="#00bfa5" />
       <div className="grid gap-4 sm:grid-cols-2">
         {cats.map((c) => (
           <div key={c} className="pv-card p-5">
@@ -335,7 +301,7 @@ function Contact({ onExplore }: { onExplore: () => void }) {
           Full-time roles, freelance projects or a collaboration on something ambitious — I&apos;d love to hear about it.
         </p>
         <div className="mt-6 flex flex-wrap gap-2">
-          <a href={`mailto:${profile.email}`} className="wv-btn wv-btn-solid" style={{ background: "#e8601c" }}>
+          <a href={`mailto:${profile.email}`} className="wv-btn wv-btn-solid" style={{ background: "#ff6d00" }}>
             <Mail size={16} /> {profile.email}
           </a>
           <a href={profile.linkedin} target="_blank" rel="noreferrer noopener" className="wv-btn">
@@ -353,5 +319,64 @@ function Contact({ onExplore }: { onExplore: () => void }) {
         </button>
       </div>
     </section>
+  );
+}
+
+/** Anime city skyline for the page hero, in day or night colours. */
+function CitySkyline({ night }: { night: boolean }) {
+  const sky = night ? ["#070d26", "#1b2456", "#4a3b7c"] : ["#4fb8ff", "#a9e2ff", "#fff1d6"];
+  const far = night ? "#1a2350" : "#8fbfe3";
+  const near = night ? "#0f1636" : "#5f8fbf";
+  const ground = night ? "#0c2a2a" : "#3c8f4a";
+  const windowOn = night ? "#ffd27a" : "#d9f2ff";
+  const far1 = [[0, 300, 90], [80, 260, 70], [150, 320, 60], [210, 240, 80], [300, 290, 60], [360, 210, 70], [440, 280, 90], [540, 250, 60], [610, 300, 80], [700, 230, 70], [780, 290, 90], [880, 260, 60], [950, 310, 80], [1040, 240, 70], [1120, 290, 60], [1190, 220, 80], [1280, 280, 70], [1360, 250, 80]];
+  const near1 = [[20, 380, 110], [140, 340, 90], [250, 400, 100], [370, 330, 80], [460, 390, 120], [600, 350, 90], [710, 410, 100], [830, 360, 80], [930, 390, 110], [1060, 340, 90], [1170, 400, 100], [1290, 350, 120]];
+  return (
+    <svg className="absolute inset-0 h-full w-full" viewBox="0 0 1440 560" preserveAspectRatio="xMidYMax slice" aria-hidden>
+      <defs>
+        <linearGradient id="pv-sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={sky[0]} />
+          <stop offset="0.55" stopColor={sky[1]} />
+          <stop offset="1" stopColor={sky[2]} />
+        </linearGradient>
+        <radialGradient id="pv-orb" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor={night ? "#fffbe8" : "#fff7cc"} />
+          <stop offset="0.35" stopColor={night ? "#fffbe8" : "#ffe28a"} stopOpacity="0.6" />
+          <stop offset="1" stopColor={night ? "#fffbe8" : "#ffe28a"} stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <rect width="1440" height="560" fill="url(#pv-sky)" />
+      {night &&
+        Array.from({ length: 60 }, (_, i) => (
+          <circle key={i} cx={(i * 197) % 1440} cy={(i * 89) % 260} r={i % 5 === 0 ? 1.8 : 1} fill="#ffffff" opacity={0.4 + (i % 4) * 0.15} />
+        ))}
+      <circle cx="1080" cy="150" r="140" fill="url(#pv-orb)" />
+      <circle cx="1080" cy="150" r={night ? 34 : 44} fill={night ? "#fffbe8" : "#fff7cc"} />
+      {!night && (
+        <g fill="#ffffff" opacity="0.9">
+          <ellipse cx="260" cy="120" rx="110" ry="24" />
+          <ellipse cx="330" cy="104" rx="70" ry="28" />
+          <ellipse cx="760" cy="80" rx="90" ry="18" />
+        </g>
+      )}
+      {/* Radio tower */}
+      <path d="M1210 420 L1232 170 L1238 170 L1260 420 Z" fill={far} />
+      <rect x="1233" y="120" width="4" height="52" fill={far} />
+      <circle cx="1235" cy="118" r="4" fill="#ff3b30" />
+      {far1.map(([x, top, w]) => (
+        <rect key={`f${x}`} x={x} y={top} width={w} height={560 - top} fill={far} />
+      ))}
+      {near1.map(([x, top, w]) => (
+        <g key={`n${x}`}>
+          <rect x={x} y={top} width={w} height={560 - top} fill={near} />
+          {Array.from({ length: Math.floor((560 - top) / 26) }, (_, r) =>
+            Array.from({ length: Math.floor(w / 22) }, (_, c) =>
+              (r + c + x) % 3 !== 0 ? <rect key={`${r}-${c}`} x={x + 6 + c * 22} y={top + 10 + r * 26} width="10" height="12" fill={windowOn} opacity={night ? 0.9 : 0.5} /> : null,
+            ),
+          )}
+        </g>
+      ))}
+      <path d="M0 500 C 300 470, 640 490, 900 480 S 1300 470, 1440 490 V560 H0 Z" fill={ground} />
+    </svg>
   );
 }

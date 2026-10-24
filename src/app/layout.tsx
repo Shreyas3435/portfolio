@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Rozha_One } from "next/font/google";
+import { Chakra_Petch, Geist, Geist_Mono } from "next/font/google";
 import { profile } from "@/data/profile";
 import "./globals.css";
 
@@ -13,10 +13,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const rozha = Rozha_One({
-  variable: "--font-rozha",
-  subsets: ["latin", "devanagari"],
-  weight: "400",
+const chakra = Chakra_Petch({
+  variable: "--font-chakra",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
 });
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://portfolio-six-bice-90.vercel.app";
@@ -92,7 +92,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${rozha.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${chakra.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <script
