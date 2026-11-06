@@ -40,10 +40,10 @@ export const timeline: TimelineEntry[] = [
   },
   {
     id: "professional-search",
-    label: "Industrial search relevance",
+    label: "Search relevance engineering",
     date: "Professional",
     description:
-      "Constraint-aware search relevance engineering on Elasticsearch for an industrial parts catalog — completed for a company, with ongoing freelance work.",
+      "Constraint-aware search relevance engineering as professional work. The details are confidential.",
     verified: false,
   },
   {

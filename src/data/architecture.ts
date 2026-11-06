@@ -17,13 +17,13 @@ export const architectureLayers: ArchitectureLayer[] = [
     id: "ai-search-logic",
     name: "AI / Search / Business Logic",
     description: "Constraint-aware ranking, entity extraction, semantic retrieval, and stateful business rules — where the actual hard problems live.",
-    exampleProjectIds: ["industrial-product-search", "website-content-search", "trek-saathi"],
+    exampleProjectIds: ["constraint-aware-search", "website-content-search", "trek-saathi"],
   },
   {
     id: "data",
     name: "Database / Vector / Search",
     description: "Elasticsearch, Weaviate, PostgreSQL, SQLite, MariaDB, and MongoDB — chosen per workload rather than defaulted to one system.",
-    exampleProjectIds: ["industrial-product-search", "website-content-search", "trek-saathi", "movie-data-pipeline"],
+    exampleProjectIds: ["constraint-aware-search", "website-content-search", "trek-saathi", "movie-data-pipeline"],
   },
   {
     id: "infra",

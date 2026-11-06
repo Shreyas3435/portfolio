@@ -7,7 +7,7 @@ export const skills: SkillNode[] = [
     name: "Search & Retrieval",
     level: "strong",
     category: "ai",
-    relatedProjectIds: ["industrial-product-search", "website-content-search"],
+    relatedProjectIds: ["constraint-aware-search", "website-content-search"],
     blurb: "Constraint-aware ranking, entity/attribute extraction, semantic + vector retrieval.",
   },
   {
@@ -109,8 +109,8 @@ export const skills: SkillNode[] = [
     name: "Elasticsearch",
     level: "strong",
     category: "systems",
-    relatedProjectIds: ["industrial-product-search"],
-    blurb: "Indexing, synonym mappings, and constraint-aware ranking at production scale.",
+    relatedProjectIds: [],
+    blurb: "Indexing, synonym mappings, and relevance tuning.",
   },
   {
     id: "databases",
